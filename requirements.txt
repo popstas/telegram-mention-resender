@@ -1,0 +1,4 @@
+telethon
+PyYAML
+black
+isort
