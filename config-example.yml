@@ -3,6 +3,8 @@ api_hash: ""
 session: data/session
 instances:
   - name: default
+    entities:
+      - https://t.me/tboom_66
     folders: []
     words: ["my username"]
     target_chat: 0

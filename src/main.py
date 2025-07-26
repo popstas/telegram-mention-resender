@@ -6,6 +6,7 @@ from typing import List, Set
 
 import yaml
 from telethon import TelegramClient, events, functions, types
+from telethon.utils import get_peer_id
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,6 +25,7 @@ class Instance:
     words: List[str]
     target_chat: int
     folders: List[str] = field(default_factory=list)
+    entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
 
 
@@ -117,16 +119,30 @@ async def get_folders_chat_ids(config_folders):
     return chat_ids
 
 
+async def resolve_entities(entities: List[str]) -> Set[int]:
+    """Resolve Telegram links or usernames to chat IDs."""
+    resolved = set()
+    for ent in entities:
+        try:
+            entity = await client.get_entity(ent)
+            resolved.add(get_peer_id(entity))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("Failed to resolve entity %s: %s", ent, exc)
+    return resolved
+
+
 async def update_instance_chat_ids(instance: Instance) -> None:
     """Refresh chat IDs for a single instance."""
     new_ids = await get_folders_chat_ids(instance.folders)
     new_ids.update(instance.chat_ids)
+    new_ids.update(await resolve_entities(instance.entities))
     instance.chat_ids = new_ids
     logger.info(
-        "Instance '%s': listening to %d chats from %d folders",
+        "Instance '%s': listening to %d chats from %d folders and %d entities",
         instance.name,
         len(instance.chat_ids),
         len(instance.folders),
+        len(instance.entities),
     )
 
 
@@ -146,6 +162,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "name": "default",
                     "folders": config.get("folders", []),
                     "chat_ids": config.get("chat_ids", []),
+                    "entities": config.get("entities", []),
                     "words": config.get("words", []),
                     "target_chat": config.get("target_chat"),
                 }
@@ -158,6 +175,7 @@ async def load_instances(config: dict) -> List[Instance]:
             name=inst_cfg.get("name", "instance"),
             folders=inst_cfg.get("folders", []),
             chat_ids=set(inst_cfg.get("chat_ids", [])),
+            entities=inst_cfg.get("entities", []),
             words=inst_cfg.get("words", []),
             target_chat=inst_cfg.get("target_chat"),
         )
