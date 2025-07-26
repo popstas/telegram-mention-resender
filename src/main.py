@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from dataclasses import dataclass, field
 from typing import List, Set
 
 import yaml
@@ -13,7 +14,20 @@ logging.basicConfig(
 logging.getLogger("telethon").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 client = None
-chat_ids: Set[int] = set()
+
+
+@dataclass
+class Instance:
+    """Configuration for a single monitoring instance."""
+
+    name: str
+    words: List[str]
+    target_chat: int
+    folders: List[str] = field(default_factory=list)
+    chat_ids: Set[int] = field(default_factory=set)
+
+
+instances: List[Instance] = []
 
 CONFIG_PATH = os.path.join("data", "config.yml")
 
@@ -92,6 +106,8 @@ def get_message_url(message):
 
 async def get_folders_chat_ids(config_folders):
     chat_ids = set()
+    if not config_folders:
+        return chat_ids
     folders = await list_folders()
     for folder_name in config_folders:
         folder = await get_folder(folders, folder_name)
@@ -101,53 +117,89 @@ async def get_folders_chat_ids(config_folders):
     return chat_ids
 
 
-async def update_chat_ids(config_folders) -> None:
-    """Refresh global chat_ids set from folders."""
-    global chat_ids
-    new_ids = await get_folders_chat_ids(config_folders)
-    chat_ids.clear()
-    chat_ids.update(new_ids)
+async def update_instance_chat_ids(instance: Instance) -> None:
+    """Refresh chat IDs for a single instance."""
+    new_ids = await get_folders_chat_ids(instance.folders)
+    new_ids.update(instance.chat_ids)
+    instance.chat_ids = new_ids
     logger.info(
-        "Listening to %d chats from %d folders", len(chat_ids), len(config_folders)
+        "Instance '%s': listening to %d chats from %d folders",
+        instance.name,
+        len(instance.chat_ids),
+        len(instance.folders),
     )
 
 
-async def rescan_loop(config_folders, interval: int = 3600) -> None:
+async def rescan_loop(instance: Instance, interval: int = 3600) -> None:
     """Periodically rescan folders for chat IDs."""
     while True:
         await asyncio.sleep(interval)
-        await update_chat_ids(config_folders)
+        await update_instance_chat_ids(instance)
+
+
+async def load_instances(config: dict) -> List[Instance]:
+    """Parse instance configurations from config."""
+    if "instances" not in config:
+        config = {
+            "instances": [
+                {
+                    "name": "default",
+                    "folders": config.get("folders", []),
+                    "chat_ids": config.get("chat_ids", []),
+                    "words": config.get("words", []),
+                    "target_chat": config.get("target_chat"),
+                }
+            ]
+        }
+
+    parsed_instances: List[Instance] = []
+    for inst_cfg in config.get("instances", []):
+        instance = Instance(
+            name=inst_cfg.get("name", "instance"),
+            folders=inst_cfg.get("folders", []),
+            chat_ids=set(inst_cfg.get("chat_ids", [])),
+            words=inst_cfg.get("words", []),
+            target_chat=inst_cfg.get("target_chat"),
+        )
+        parsed_instances.append(instance)
+    return parsed_instances
 
 
 async def main() -> None:
-    global client
+    global client, instances
     config = load_config()
-    config_folders = config.get("folders", [])
-    words = config.get("words", [])
-    target_chat = config.get("target_chat")
 
     api_id, api_hash, session_name = get_api_credentials(config)
 
     client = TelegramClient(session_name, api_id, api_hash)
     await client.start()
 
-    await update_chat_ids(config_folders)
-    asyncio.create_task(rescan_loop(config_folders))
+    instances = await load_instances(config)
+    for inst in instances:
+        await update_instance_chat_ids(inst)
+        asyncio.create_task(rescan_loop(inst))
 
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
-        if event.chat_id not in chat_ids:
-            return
         message = event.message
-        if message.raw_text and word_in_text(words, message.raw_text):
-            try:
-                url = get_message_url(message)
-                await client.send_message(target_chat, f"forwarded from: {url}")
-
-                await message.forward_to(target_chat)
-                logger.info("Forwarded message %s to %s", message.id, target_chat)
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.error("Failed to forward message: %s", exc)
+        for inst in instances:
+            if event.chat_id not in inst.chat_ids:
+                continue
+            if message.raw_text and word_in_text(inst.words, message.raw_text):
+                try:
+                    url = get_message_url(message)
+                    await client.send_message(
+                        inst.target_chat, f"forwarded from: {url}"
+                    )
+                    await message.forward_to(inst.target_chat)
+                    logger.info(
+                        "Forwarded message %s to %s for %s",
+                        message.id,
+                        inst.target_chat,
+                        inst.name,
+                    )
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.error("Failed to forward message: %s", exc)
 
     await client.run_until_disconnected()
 

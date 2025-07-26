@@ -1,6 +1,8 @@
 api_id: 0
 api_hash: ""
 session: data/session
-folders: []
-words: ["my username"]
-target_chat: 0
+instances:
+  - name: default
+    folders: []
+    words: ["my username"]
+    target_chat: 0
