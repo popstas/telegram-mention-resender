@@ -28,7 +28,9 @@ python -m src.main
 ```
 
 The application will listen to new messages in the configured folders and
-forward those containing any of the specified words to the target chat.
+forward those containing any of the specified words to the target chat. The
+list of chats is rescanned every hour so newly added chats are picked up
+automatically.
 
 ## Development
 
@@ -39,3 +41,13 @@ pre-commit install
 ```
 
 This will automatically run `black` and `isort` before each commit.
+
+## Docker
+
+You can also run the bot using Docker:
+
+```bash
+docker build -t mention-resender .
+docker run -v $(pwd)/data:/app/data mention-resender
+```
+

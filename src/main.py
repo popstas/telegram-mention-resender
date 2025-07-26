@@ -6,7 +6,12 @@ from typing import List
 import yaml
 from telethon import TelegramClient, events
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logging.getLogger("telethon").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -51,13 +56,25 @@ async def main() -> None:
     await client.start()
 
     chat_ids = set()
-    for folder in folders:
-        async for dialog in client.iter_dialogs(folder=folder):
-            chat_ids.add(dialog.id)
 
-    logger.info("Listening to %d chats", len(chat_ids))
+    async def scan_chats() -> None:
+        new_chat_ids = set()
+        for folder in folders:
+            async for dialog in client.iter_dialogs(folder=folder):
+                new_chat_ids.add(dialog.id)
+        chat_ids.clear()
+        chat_ids.update(new_chat_ids)
+        logger.info("Listening to %d chats", len(chat_ids))
 
-    @client.on(events.NewMessage(chats=list(chat_ids)))
+    async def scan_loop() -> None:
+        while True:
+            await scan_chats()
+            await asyncio.sleep(3600)
+
+    await scan_chats()
+    asyncio.create_task(scan_loop())
+
+    @client.on(events.NewMessage(func=lambda e: e.chat_id in chat_ids))
     async def handler(event: events.NewMessage.Event) -> None:
         message = event.message
         if message.raw_text and word_in_text(words, message.raw_text):
