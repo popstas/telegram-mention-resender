@@ -1,7 +1,13 @@
 # telegram-mention-resender
 
 This project listens to mentions in specified Telegram chats and forwards
-matching messages to a target chat. It is built using [Telethon](https://github.com/LonamiWebs/Telethon).
+matching messages to a target chat.
+
+# Features
+
+- Listen folders, chats, channels
+- Multiple instances for different chats, words and targets
+- Each instance has target chat
 
 ## Setup
 
@@ -30,6 +36,8 @@ The application will listen to new messages in all configured instances and
 forward those containing any of the specified words to their target chats.
 
 ## Development
+
+It is built using [Telethon](https://github.com/LonamiWebs/Telethon).
 
 Install pre-commit hooks:
 
