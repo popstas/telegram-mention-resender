@@ -1,14 +1,19 @@
 import asyncio
 import logging
 import os
-from typing import List
+from typing import List, Set
 
 import yaml
 from telethon import TelegramClient, events, functions, types
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logging.getLogger("telethon").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 client = None
+chat_ids: Set[int] = set()
 
 CONFIG_PATH = os.path.join("data", "config.yml")
 
@@ -96,6 +101,24 @@ async def get_folders_chat_ids(config_folders):
     return chat_ids
 
 
+async def update_chat_ids(config_folders) -> None:
+    """Refresh global chat_ids set from folders."""
+    global chat_ids
+    new_ids = await get_folders_chat_ids(config_folders)
+    chat_ids.clear()
+    chat_ids.update(new_ids)
+    logger.info(
+        "Listening to %d chats from %d folders", len(chat_ids), len(config_folders)
+    )
+
+
+async def rescan_loop(config_folders, interval: int = 3600) -> None:
+    """Periodically rescan folders for chat IDs."""
+    while True:
+        await asyncio.sleep(interval)
+        await update_chat_ids(config_folders)
+
+
 async def main() -> None:
     global client
     config = load_config()
@@ -108,13 +131,13 @@ async def main() -> None:
     client = TelegramClient(session_name, api_id, api_hash)
     await client.start()
 
-    chat_ids = await get_folders_chat_ids(config_folders)
-    logger.info(
-        "Listening to %d chats from %d folders", len(chat_ids), len(config_folders)
-    )
+    await update_chat_ids(config_folders)
+    asyncio.create_task(rescan_loop(config_folders))
 
-    @client.on(events.NewMessage(chats=list(chat_ids)))
+    @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
+        if event.chat_id not in chat_ids:
+            return
         message = event.message
         if message.raw_text and word_in_text(words, message.raw_text):
             try:
