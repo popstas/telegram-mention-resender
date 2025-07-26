@@ -10,7 +10,8 @@ from telethon.utils import get_peer_id
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(levelname)s - %(message)s",
 )
 logging.getLogger("telethon").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -131,13 +132,15 @@ async def resolve_entities(entities: List[str]) -> Set[int]:
     return resolved
 
 
-async def update_instance_chat_ids(instance: Instance) -> None:
+async def update_instance_chat_ids(instance: Instance, first_run: bool = False) -> None:
     """Refresh chat IDs for a single instance."""
     new_ids = await get_folders_chat_ids(instance.folders)
     new_ids.update(instance.chat_ids)
     new_ids.update(await resolve_entities(instance.entities))
     instance.chat_ids = new_ids
-    logger.info(
+    log_level = logging.INFO if first_run else logging.DEBUG
+    logger.log(
+        log_level,
         "Instance '%s': listening to %d chats from %d folders and %d entities",
         instance.name,
         len(instance.chat_ids),
@@ -150,7 +153,7 @@ async def rescan_loop(instance: Instance, interval: int = 3600) -> None:
     """Periodically rescan folders for chat IDs."""
     while True:
         await asyncio.sleep(interval)
-        await update_instance_chat_ids(instance)
+        await update_instance_chat_ids(instance, False)
 
 
 async def load_instances(config: dict) -> List[Instance]:
@@ -194,7 +197,7 @@ async def main() -> None:
 
     instances = await load_instances(config)
     for inst in instances:
-        await update_instance_chat_ids(inst)
+        await update_instance_chat_ids(inst, True)
         asyncio.create_task(rescan_loop(inst))
 
     @client.on(events.NewMessage)
