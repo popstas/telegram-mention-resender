@@ -2,3 +2,7 @@ telethon
 PyYAML
 black
 isort
+pytest
+pytest-asyncio
+pytest-cov
+coverage
