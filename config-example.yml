@@ -1,6 +1,7 @@
 api_id: 0
 api_hash: ""
 session: data/session
+log_level: info
 instances:
   - name: default
     entities:

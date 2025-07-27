@@ -8,12 +8,14 @@ import yaml
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id
 
-logging.basicConfig(
-    level=logging.INFO,
-    # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    format="%(levelname)s - %(message)s",
-)
-logging.getLogger("telethon").setLevel(logging.WARNING)
+
+def setup_logging(level: str = "info") -> None:
+    """Configure logging for the application."""
+    numeric_level = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(level=numeric_level, format="%(levelname)s - %(message)s")
+    logging.getLogger("telethon").setLevel(logging.WARNING)
+
+
 logger = logging.getLogger(__name__)
 client = None
 
@@ -189,6 +191,8 @@ async def load_instances(config: dict) -> List[Instance]:
 async def main() -> None:
     global client, instances
     config = load_config()
+
+    setup_logging(config.get("log_level", "info"))
 
     api_id, api_hash, session_name = get_api_credentials(config)
 

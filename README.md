@@ -23,6 +23,7 @@ pip install -r requirements.txt
 - `api_id` – your Telegram API ID.
 - `api_hash` – your Telegram API hash.
 - `session` – path to your session file (default is `data/session`).
+- `log_level` – logging level (default is `info`).
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words` and `target_chat`.
 
