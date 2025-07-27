@@ -40,8 +40,14 @@ async def test_get_folders_chat_ids(monkeypatch, dummy_folder_peers_cls):
 
     monkeypatch.setattr(main, "list_folders", fake_list_folders)
 
+    from telethon import types
+
     chat_ids = await main.get_folders_chat_ids(["F1"])
-    assert chat_ids == {1, 2}
+    expected = {
+        main.get_peer_id(types.PeerChannel(1)),
+        main.get_peer_id(types.PeerChannel(2)),
+    }
+    assert chat_ids == expected
 
 
 @pytest.mark.asyncio
@@ -54,6 +60,14 @@ async def test_update_instance_chat_ids(monkeypatch):
         assert entities == ["e"]
         return {6}
 
+    async def fake_get_input_entity(cid):
+        from telethon import types
+
+        return types.InputPeerChat(cid)
+
+    client = SimpleNamespace(get_input_entity=fake_get_input_entity)
+
+    monkeypatch.setattr(main, "client", client)
     monkeypatch.setattr(main, "get_folders_chat_ids", fake_get_folders_chat_ids)
     monkeypatch.setattr(main, "resolve_entities", fake_resolve_entities)
 
@@ -62,12 +76,12 @@ async def test_update_instance_chat_ids(monkeypatch):
     )
 
     await main.update_instance_chat_ids(inst, True)
-    assert inst.chat_ids == {4, 5, 6}
+    assert inst.chat_ids == {-4, -5, -6}
 
 
 @pytest.mark.asyncio
-async def test_get_folders_chat_ids_channel_with_topics(monkeypatch):
-    from telethon import functions, types
+async def test_get_folders_chat_ids_channel(monkeypatch):
+    from telethon import types
 
     channel = types.InputPeerChannel(1, 2)
     folder = SimpleNamespace(title="F1", include_peers=[channel])
@@ -75,22 +89,11 @@ async def test_get_folders_chat_ids_channel_with_topics(monkeypatch):
     async def fake_list_folders():
         return [folder]
 
-    class DummyClient:
-        def __init__(self):
-            self.calls = []
-
-        async def __call__(self, req):
-            assert isinstance(req, functions.channels.GetForumTopicsRequest)
-            self.calls.append(True)
-            return SimpleNamespace(
-                topics=[SimpleNamespace(id=10), SimpleNamespace(id=11)]
-            )
-
     monkeypatch.setattr(main, "list_folders", fake_list_folders)
-    monkeypatch.setattr(main, "client", DummyClient())
 
     chat_ids = await main.get_folders_chat_ids(["F1"])
-    assert chat_ids == {1, 10, 11}
+    expected = {main.get_peer_id(types.PeerChannel(1))}
+    assert chat_ids == expected
 
 
 @pytest.mark.asyncio
@@ -107,4 +110,8 @@ async def test_get_folders_chat_ids_chat_and_user(monkeypatch):
     monkeypatch.setattr(main, "list_folders", fake_list_folders)
 
     chat_ids = await main.get_folders_chat_ids(["F2"])
-    assert chat_ids == {7, 8}
+    expected = {
+        main.get_peer_id(types.PeerChat(7)),
+        main.get_peer_id(types.PeerUser(8)),
+    }
+    assert chat_ids == expected
