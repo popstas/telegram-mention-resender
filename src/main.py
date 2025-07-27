@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import List, Set
 
@@ -8,14 +9,19 @@ import yaml
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id
 
-logging.basicConfig(
-    level=logging.INFO,
-    # format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    format="%(levelname)s - %(message)s",
-)
-logging.getLogger("telethon").setLevel(logging.WARNING)
+
+def setup_logging(level: str = "info") -> None:
+    """Configure logging for the application."""
+    numeric_level = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(level=numeric_level, format="%(levelname)s - %(message)s")
+    logging.getLogger("telethon").setLevel(logging.WARNING)
+
+
 logger = logging.getLogger(__name__)
 client = None
+
+# Cache for entity names by chat_identifier
+entity_name_cache = {}
 
 
 @dataclass
@@ -186,9 +192,65 @@ async def load_instances(config: dict) -> List[Instance]:
     return parsed_instances
 
 
+async def get_entity_name(chat_identifier: str) -> str:
+    if not chat_identifier:
+        return "chat_history"
+
+    # Check cache first
+    if chat_identifier in entity_name_cache:
+        return entity_name_cache[chat_identifier]
+
+    try:
+        entity = await client.get_entity(chat_identifier)
+        if not entity:
+            return None
+
+        if hasattr(entity, "title"):
+            name = entity.title
+        elif hasattr(entity, "username") and entity.username:
+            name = entity.username
+        elif hasattr(entity, "first_name") or hasattr(entity, "last_name"):
+            name = " ".join(
+                filter(
+                    None,
+                    [
+                        getattr(entity, "first_name", ""),
+                        getattr(entity, "last_name", ""),
+                    ],
+                )
+            )
+        else:
+            name = str(entity.id)
+
+        safe_name = re.sub(r"[^\w\-_.]", "_", name.strip())
+        result = safe_name or "chat_history"
+
+        # Cache the result
+        entity_name_cache[chat_identifier] = result
+        return result
+
+    except Exception:
+        chat = chat_identifier
+        if chat.startswith("@"):
+            chat = chat[1:]
+        elif "//" in chat:
+            chat = chat.split("?")[0].rstrip("/").split("/")[-1]
+            if chat.startswith("+"):
+                chat = "invite_" + chat[1:]
+
+        safe_name = re.sub(r"[^\w\-_.]", "_", chat)
+        result = safe_name or "chat_history"
+
+        # Cache the fallback result too
+        entity_name_cache[chat_identifier] = result
+        return result
+
+
 async def main() -> None:
     global client, instances
     config = load_config()
+
+    setup_logging(config.get("log_level", "info"))
 
     api_id, api_hash, session_name = get_api_credentials(config)
 
@@ -206,6 +268,9 @@ async def main() -> None:
         for inst in instances:
             if event.chat_id not in inst.chat_ids:
                 continue
+
+            chat_name = await get_entity_name(event.chat_id)
+            target_chat_name = await get_entity_name(inst.target_chat)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
                     url = get_message_url(message)
@@ -214,13 +279,21 @@ async def main() -> None:
                     )
                     await message.forward_to(inst.target_chat)
                     logger.info(
-                        "Forwarded message %s to %s for %s",
+                        "Forwarded message %s from %s to %s for %s",
                         message.id,
-                        inst.target_chat,
+                        chat_name,
+                        target_chat_name,
                         inst.name,
                     )
                 except Exception as exc:  # pylint: disable=broad-except
                     logger.error("Failed to forward message: %s", exc)
+            else:
+                logger.debug(
+                    "Message %s from %s not forwarded for %s",
+                    message.id,
+                    chat_name,
+                    inst.name,
+                )
 
     await client.run_until_disconnected()
 
