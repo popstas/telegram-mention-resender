@@ -47,33 +47,12 @@ async def test_setup_logging(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_main_flow(monkeypatch):
+async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     config = {"log_level": "info"}
     monkeypatch.setattr(main, "load_config", lambda: config)
     monkeypatch.setattr(main, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
-    class DummyTG:
-        def __init__(self):
-            self.on_handler = None
-            self.sent = []
-            self.started = False
-
-        async def start(self):
-            self.started = True
-
-        def on(self, event):
-            def deco(func):
-                self.on_handler = func
-                return func
-            return deco
-
-        async def send_message(self, *args, **kwargs):
-            self.sent.append((args, kwargs))
-
-        async def run_until_disconnected(self):
-            return None
-
-    dummy_client = DummyTG()
+    dummy_client = dummy_tg_client
     monkeypatch.setattr(main, "TelegramClient", lambda s, a, b: dummy_client)
 
     async def fake_rescan(inst):
@@ -100,8 +79,7 @@ async def test_main_flow(monkeypatch):
     await main.main()
 
     handler = dummy_client.on_handler
-    msg = SimpleNamespace(raw_text="hi there", id=5, peer_id=SimpleNamespace(channel_id=1))
-    msg.forward_to = lambda target: msg.__dict__.setdefault("forwarded", []).append(target)
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="hi there")
     event = SimpleNamespace(message=msg, chat_id=1)
     await handler(event)
     assert msg.forwarded == [99]

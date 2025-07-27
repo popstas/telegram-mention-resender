@@ -6,34 +6,10 @@ import pytest
 import src.main as main
 
 
-class DummyClientForList:
-    def __init__(self, filters):
-        self.connected = False
-        self.filters = filters
-        self.calls = []
-
-    def is_connected(self):
-        return self.connected
-
-    async def connect(self):
-        self.connected = True
-        self.calls.append("connect")
-
-    async def __call__(self, req):
-        self.calls.append("request")
-        return SimpleNamespace(filters=self.filters)
-
-
-def create_filter():
-    from telethon import types
-
-    return types.DialogFilter(id=1, title=None, pinned_peers=[], include_peers=[], exclude_peers=[])
-
-
 @pytest.mark.asyncio
-async def test_list_folders_connect(monkeypatch):
+async def test_list_folders_connect(monkeypatch, create_filter, dummy_client_for_list):
     f = create_filter()
-    client = DummyClientForList([f])
+    client = dummy_client_for_list([f])
     monkeypatch.setattr(main, "client", client)
     result = await main.list_folders()
     assert client.connected is True
@@ -41,40 +17,27 @@ async def test_list_folders_connect(monkeypatch):
     assert result == [f]
 
 
-class DummyFolder:
-    def __init__(self, title):
-        self.title = title
-        self.include_peers = []
 
 
 @pytest.mark.asyncio
-async def test_get_folder_with_title_text():
-    folders = [DummyFolder(SimpleNamespace(text="MyFolder"))]
+async def test_get_folder_with_title_text(dummy_folder_cls):
+    folders = [dummy_folder_cls(SimpleNamespace(text="MyFolder"))]
     folder = await main.get_folder(folders, "MyFolder")
     assert folder is folders[0]
 
 
 @pytest.mark.asyncio
-async def test_get_folder_not_found():
-    folders = [DummyFolder("Other")]
+async def test_get_folder_not_found(dummy_folder_cls):
+    folders = [dummy_folder_cls("Other")]
     result = await main.get_folder(folders, "Missing")
     assert result is None
 
 
-class DummyPeer:
-    def __init__(self, cid):
-        self.channel_id = cid
-
-
-class DummyFolderPeers(DummyFolder):
-    def __init__(self, title, peers):
-        super().__init__(title)
-        self.include_peers = [DummyPeer(cid) for cid in peers]
 
 
 @pytest.mark.asyncio
-async def test_get_folders_chat_ids(monkeypatch):
-    folders = [DummyFolderPeers("F1", [1, 2])]
+async def test_get_folders_chat_ids(monkeypatch, dummy_folder_peers_cls):
+    folders = [dummy_folder_peers_cls("F1", [1, 2])]
 
     async def fake_list_folders():
         return folders

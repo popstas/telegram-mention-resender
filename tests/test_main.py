@@ -12,21 +12,17 @@ def test_word_in_text_basic():
     assert main.word_in_text(words, "no match") is False
 
 
-class DummyMessage:
-    def __init__(self, peer_id):
-        self.peer_id = peer_id
-        self.id = 123
 
 
-def test_get_message_url_object_peer():
+def test_get_message_url_object_peer(dummy_message_cls):
     peer = SimpleNamespace(channel_id=42)
-    msg = DummyMessage(peer)
+    msg = dummy_message_cls(peer)
     assert main.get_message_url(msg) == "https://t.me/c/42/123"
 
 
-def test_get_message_url_dict_peer():
+def test_get_message_url_dict_peer(dummy_message_cls):
     peer = {"channel_id": 7}
-    msg = DummyMessage(peer)
+    msg = dummy_message_cls(peer)
     assert main.get_message_url(msg) == "https://t.me/c/7/123"
 
 
