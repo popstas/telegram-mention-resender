@@ -7,6 +7,39 @@ import src.main as main
 
 
 @pytest.mark.asyncio
+async def test_get_entity_name_with_cache_and_client(monkeypatch):
+    calls = []
+
+    class DummyClient:
+        async def get_entity(self, ident):
+            calls.append(ident)
+            return SimpleNamespace(title="Chat Name")
+
+    main.client = DummyClient()
+    main.entity_name_cache.clear()
+
+    name = await main.get_entity_name("id1")
+    assert name == "Chat_Name"
+    # Second call should hit cache and not call client again
+    name2 = await main.get_entity_name("id1")
+    assert name2 == "Chat_Name"
+    assert calls == ["id1"]
+
+
+@pytest.mark.asyncio
+async def test_get_entity_name_error(monkeypatch):
+    class FailClient:
+        async def get_entity(self, ident):
+            raise RuntimeError("fail")
+
+    main.client = FailClient()
+    main.entity_name_cache.clear()
+
+    name = await main.get_entity_name("https://t.me/testchat?param=1")
+    assert name == "testchat"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "entity,expected",
     [

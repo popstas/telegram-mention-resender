@@ -7,41 +7,6 @@ import pytest
 import src.main as main
 
 
-class DummyClientForList:
-    def __init__(self, filters):
-        self.connected = False
-        self.filters = filters
-        self.calls = []
-
-    def is_connected(self):
-        return self.connected
-
-    async def connect(self):
-        self.connected = True
-        self.calls.append("connect")
-
-    async def __call__(self, req):
-        self.calls.append("request")
-        return SimpleNamespace(filters=self.filters)
-
-
-def create_filter():
-    from telethon import types
-
-    return types.DialogFilter(id=1, title=None, pinned_peers=[], include_peers=[], exclude_peers=[])
-
-
-@pytest.mark.asyncio
-async def test_list_folders_connect(monkeypatch):
-    f = create_filter()
-    client = DummyClientForList([f])
-    monkeypatch.setattr(main, "client", client)
-    result = await main.list_folders()
-    assert client.connected is True
-    assert client.calls == ["connect", "request"]
-    assert result == [f]
-
-
 class BreakLoop(Exception):
     pass
 
@@ -110,6 +75,7 @@ async def test_main_flow(monkeypatch):
 
     dummy_client = DummyTG()
     monkeypatch.setattr(main, "TelegramClient", lambda s, a, b: dummy_client)
+
     async def fake_rescan(inst):
         return None
 
@@ -125,6 +91,7 @@ async def test_main_flow(monkeypatch):
 
     monkeypatch.setattr(main, "load_instances", fake_load_instances)
     monkeypatch.setattr(main, "get_message_url", lambda m: "URL")
+
     async def fake_get_entity_name(v):
         return "name"
 

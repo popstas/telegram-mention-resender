@@ -72,21 +72,3 @@ def test_load_instances_backward_compat():
     assert inst.target_chat == 2
 
 
-@pytest.mark.asyncio
-async def test_get_entity_name_with_cache_and_client(monkeypatch):
-    calls = []
-
-    class DummyClient:
-        async def get_entity(self, ident):
-            calls.append(ident)
-            return SimpleNamespace(title="Chat Name")
-
-    main.client = DummyClient()
-    main.entity_name_cache.clear()
-
-    name = await main.get_entity_name("id1")
-    assert name == "Chat_Name"
-    # Second call should hit cache and not call client again
-    name2 = await main.get_entity_name("id1")
-    assert name2 == "Chat_Name"
-    assert calls == ["id1"]
