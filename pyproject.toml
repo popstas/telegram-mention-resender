@@ -31,6 +31,10 @@ dev = [
     "black",
     "isort",
     "pre-commit",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "coverage",
 ]
 
 [project.scripts]
