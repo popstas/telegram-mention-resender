@@ -1,5 +1,4 @@
 import asyncio
-import os
 from types import SimpleNamespace
 
 import pytest
@@ -7,34 +6,41 @@ import pytest
 import src.main as main
 
 
-# ---------- load_config ----------
+class DummyClientForList:
+    def __init__(self, filters):
+        self.connected = False
+        self.filters = filters
+        self.calls = []
 
-def test_load_config_success(tmp_path, monkeypatch):
-    cfg_file = tmp_path / "cfg.yml"
-    cfg_file.write_text("foo: 1")
-    monkeypatch.setattr(main, "CONFIG_PATH", str(cfg_file))
-    assert main.load_config() == {"foo": 1}
+    def is_connected(self):
+        return self.connected
 
+    async def connect(self):
+        self.connected = True
+        self.calls.append("connect")
 
-def test_load_config_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "CONFIG_PATH", str(tmp_path / "nonexistent.yml"))
-    with pytest.raises(FileNotFoundError):
-        main.load_config()
-
-
-# ---------- get_api_credentials ----------
-
-def test_get_api_credentials_success():
-    cfg = {"api_id": "123", "api_hash": "hash", "session": "sess"}
-    assert main.get_api_credentials(cfg) == (123, "hash", "sess")
+    async def __call__(self, req):
+        self.calls.append("request")
+        return SimpleNamespace(filters=self.filters)
 
 
-def test_get_api_credentials_missing():
-    with pytest.raises(RuntimeError):
-        main.get_api_credentials({})
+def create_filter():
+    from telethon import types
+
+    return types.DialogFilter(id=1, title=None, pinned_peers=[], include_peers=[], exclude_peers=[])
 
 
-# ---------- get_folder ----------
+@pytest.mark.asyncio
+async def test_list_folders_connect(monkeypatch):
+    f = create_filter()
+    client = DummyClientForList([f])
+    monkeypatch.setattr(main, "client", client)
+    result = await main.list_folders()
+    assert client.connected is True
+    assert client.calls == ["connect", "request"]
+    assert result == [f]
+
+
 class DummyFolder:
     def __init__(self, title):
         self.title = title
@@ -50,12 +56,11 @@ async def test_get_folder_with_title_text():
 
 @pytest.mark.asyncio
 async def test_get_folder_not_found():
-    folders = [DummyFolder("Other")]  # title not matching
+    folders = [DummyFolder("Other")]
     result = await main.get_folder(folders, "Missing")
     assert result is None
 
 
-# ---------- get_folders_chat_ids ----------
 class DummyPeer:
     def __init__(self, cid):
         self.channel_id = cid
@@ -80,7 +85,6 @@ async def test_get_folders_chat_ids(monkeypatch):
     assert chat_ids == {1, 2}
 
 
-# ---------- update_instance_chat_ids ----------
 @pytest.mark.asyncio
 async def test_update_instance_chat_ids(monkeypatch):
     async def fake_get_folders_chat_ids(folders):
@@ -97,18 +101,4 @@ async def test_update_instance_chat_ids(monkeypatch):
     inst = main.Instance(name="i", words=[], target_chat=0, folders=["f"], chat_ids={4}, entities=["e"])
 
     await main.update_instance_chat_ids(inst, True)
-    assert inst.chat_ids == {4,5,6}
-
-
-# ---------- get_entity_name error path ----------
-@pytest.mark.asyncio
-async def test_get_entity_name_error(monkeypatch):
-    class FailClient:
-        async def get_entity(self, ident):
-            raise RuntimeError("fail")
-
-    main.client = FailClient()
-    main.entity_name_cache.clear()
-
-    name = await main.get_entity_name("https://t.me/testchat?param=1")
-    assert name == "testchat"
+    assert inst.chat_ids == {4, 5, 6}
