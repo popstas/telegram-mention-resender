@@ -121,8 +121,36 @@ async def get_folders_chat_ids(config_folders):
     folders = await list_folders()
     for folder_name in config_folders:
         folder = await get_folder(folders, folder_name)
-        if folder:
-            for dialog in folder.include_peers:
+        if not folder:
+            continue
+        for dialog in folder.include_peers:
+            if isinstance(dialog, types.InputPeerChannel):
+                chat_ids.add(dialog.channel_id)
+                try:
+                    result = await client(
+                        functions.channels.GetForumTopicsRequest(
+                            channel=dialog,
+                            offset_date=None,
+                            offset_id=0,
+                            offset_topic=0,
+                            limit=100,
+                            q=None,
+                        )
+                    )
+                    for topic in getattr(result, "topics", []):
+                        if hasattr(topic, "id"):
+                            chat_ids.add(topic.id)
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.error(
+                        "Failed to fetch topics for channel %s: %s",
+                        dialog.channel_id,
+                        exc,
+                    )
+            elif isinstance(dialog, types.InputPeerChat):
+                chat_ids.add(dialog.chat_id)
+            elif isinstance(dialog, types.InputPeerUser):
+                chat_ids.add(dialog.user_id)
+            elif hasattr(dialog, "channel_id"):
                 chat_ids.add(dialog.channel_id)
     return chat_ids
 
