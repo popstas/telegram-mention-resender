@@ -114,16 +114,58 @@ def get_message_url(message):
     return url
 
 
+async def to_event_chat_id(peer) -> int | None:
+    """Convert various peer representations to ``event.chat_id`` format."""
+    if peer is None:
+        return None
+
+    if isinstance(peer, int):
+        if peer <= 0:
+            return peer
+        try:
+            ent = await client.get_input_entity(peer)
+            return get_peer_id(ent)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("Failed to resolve peer %s: %s", peer, exc)
+            return -peer
+
+    try:
+        return get_peer_id(peer)
+    except Exception:
+        if hasattr(peer, "channel_id"):
+            return get_peer_id(types.PeerChannel(peer.channel_id))
+        if hasattr(peer, "chat_id"):
+            return get_peer_id(types.PeerChat(peer.chat_id))
+        if hasattr(peer, "user_id"):
+            return peer.user_id
+    return None
+
+
+async def normalize_chat_ids(ids: Set[int]) -> Set[int]:
+    """Normalize a set of chat IDs to ``event.chat_id`` format."""
+    result = set()
+    for cid in ids:
+        result.add(await to_event_chat_id(cid))
+    return {i for i in result if i is not None}
+
+
 async def get_folders_chat_ids(config_folders):
+    """Return chat IDs for all peers included in the given folders."""
     chat_ids = set()
     if not config_folders:
         return chat_ids
+
     folders = await list_folders()
     for folder_name in config_folders:
         folder = await get_folder(folders, folder_name)
-        if folder:
-            for dialog in folder.include_peers:
-                chat_ids.add(dialog.channel_id)
+        if not folder:
+            continue
+
+        for dialog in folder.include_peers:
+            chat_id = await to_event_chat_id(dialog)
+            if chat_id is not None:
+                chat_ids.add(chat_id)
+
     return chat_ids
 
 
@@ -144,7 +186,7 @@ async def update_instance_chat_ids(instance: Instance, first_run: bool = False) 
     new_ids = await get_folders_chat_ids(instance.folders)
     new_ids.update(instance.chat_ids)
     new_ids.update(await resolve_entities(instance.entities))
-    instance.chat_ids = new_ids
+    instance.chat_ids = await normalize_chat_ids(new_ids)
     log_level = logging.INFO if first_run else logging.DEBUG
     logger.log(
         log_level,
