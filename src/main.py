@@ -19,6 +19,7 @@ def setup_logging(level: str = "info") -> None:
 
 logger = logging.getLogger(__name__)
 client = None
+config: dict = {}
 
 # Cache for entity names by chat_identifier
 entity_name_cache = {}
@@ -157,8 +158,10 @@ async def update_instance_chat_ids(instance: Instance, first_run: bool = False) 
 
 async def rescan_loop(instance: Instance, interval: int = 3600) -> None:
     """Periodically rescan folders for chat IDs."""
+    global config
     while True:
         await asyncio.sleep(interval)
+        config = load_config()
         await update_instance_chat_ids(instance, False)
 
 
@@ -247,7 +250,7 @@ async def get_entity_name(chat_identifier: str) -> str:
 
 
 async def main() -> None:
-    global client, instances
+    global client, instances, config
     config = load_config()
 
     setup_logging(config.get("log_level", "info"))

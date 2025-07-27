@@ -14,6 +14,7 @@ class BreakLoop(Exception):
 @pytest.mark.asyncio
 async def test_rescan_loop(monkeypatch):
     sleep_calls = []
+    load_calls = []
 
     async def fake_sleep(t):
         sleep_calls.append(t)
@@ -22,13 +23,19 @@ async def test_rescan_loop(monkeypatch):
     async def fake_update(inst, fr):
         raise BreakLoop
 
+    def fake_load_config():
+        load_calls.append(True)
+        return {}
+
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(main, "update_instance_chat_ids", fake_update)
+    monkeypatch.setattr(main, "load_config", fake_load_config)
 
     inst = main.Instance(name="i", words=[], target_chat=0)
     with pytest.raises(BreakLoop):
         await main.rescan_loop(inst, interval=0)
     assert sleep_calls == [0]
+    assert len(load_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -77,6 +84,7 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     monkeypatch.setattr(main, "get_entity_name", fake_get_entity_name)
 
     await main.main()
+    assert main.config is config
 
     handler = dummy_client.on_handler
     msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="hi there")
