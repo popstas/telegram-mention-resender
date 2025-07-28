@@ -141,7 +141,10 @@ async def get_message_source(message):
         if chat_username:
             name = f"@{chat_username}"
 
-    result = f"Forwarded from: {chat_type} {name}"
+    if chat_type == "private":
+        result = f"Forwarded from: {chat_type} {name}"
+    else:
+        result = f"Forwarded from: {name}"
     if url:
         result += f" - {url}"
     return result
