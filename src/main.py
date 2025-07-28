@@ -36,9 +36,12 @@ class Instance:
     folders: List[str] = field(default_factory=list)
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
+    folder_mute: bool = False
 
 
 instances: List[Instance] = []
+
+MUTE_FOREVER = 2**31 - 1
 
 CONFIG_PATH = os.path.join("data", "config.yml")
 
@@ -102,14 +105,20 @@ async def list_folders():
 
 
 def get_message_url(message):
-    if isinstance(message.peer_id, dict):
+    peer = getattr(message, "peer_id", None)
+    chat_id = None
+    if isinstance(peer, dict):
+        chat_id = peer.get("channel_id") or peer.get("chat_id") or peer.get("user_id")
+    elif peer is not None:
         chat_id = (
-            message.peer_id.get("channel_id")
-            or message.peer_id.get("chat_id")
-            or message.peer_id.get("user_id")
+            getattr(peer, "channel_id", None)
+            or getattr(peer, "chat_id", None)
+            or getattr(peer, "user_id", None)
         )
-    else:
-        chat_id = message.channel_id or message.chat_id
+    if chat_id is None:
+        chat_id = getattr(message, "channel_id", None) or getattr(
+            message, "chat_id", None
+        )
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
@@ -182,12 +191,72 @@ async def resolve_entities(entities: List[str]) -> Set[int]:
     return resolved
 
 
+async def mute_notify_peer(notify_peer) -> None:
+    try:
+        settings = await client(functions.account.GetNotifySettingsRequest(notify_peer))
+        mute_until = getattr(settings, "mute_until", None)
+        ts = (
+            int(mute_until.timestamp())
+            if hasattr(mute_until, "timestamp")
+            else (mute_until or 0)
+        )
+        if ts != MUTE_FOREVER:
+            await client(
+                functions.account.UpdateNotifySettingsRequest(
+                    peer=notify_peer,
+                    settings=types.InputPeerNotifySettings(mute_until=MUTE_FOREVER),
+                )
+            )
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Failed to mute peer %s: %s", notify_peer, exc)
+
+
+async def mute_peer_and_topics(peer) -> None:
+    try:
+        ip = await client.get_input_entity(peer)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Failed to resolve peer %s for mute: %s", peer, exc)
+        return
+
+    await mute_notify_peer(types.InputNotifyPeer(ip))
+
+    try:
+        topics = await client(
+            functions.channels.GetForumTopicsRequest(
+                channel=ip,
+                offset_date=None,
+                offset_id=0,
+                offset_topic=0,
+                limit=100,
+            )
+        )
+        for t in getattr(topics, "topics", []):
+            notify = types.InputNotifyForumTopic(peer=ip, top_msg_id=t.top_message)
+            await mute_notify_peer(notify)
+    except Exception:
+        pass
+
+
+async def mute_chats_from_folders(folder_names: List[str]) -> None:
+    if not folder_names:
+        return
+    folders = await list_folders()
+    for fname in folder_names:
+        folder = await get_folder(folders, fname)
+        if not folder:
+            continue
+        for p in getattr(folder, "include_peers", []):
+            await mute_peer_and_topics(p)
+
+
 async def update_instance_chat_ids(instance: Instance, first_run: bool = False) -> None:
     """Refresh chat IDs for a single instance."""
     new_ids = await get_folders_chat_ids(instance.folders)
     new_ids.update(instance.chat_ids)
     new_ids.update(await resolve_entities(instance.entities))
     instance.chat_ids = await normalize_chat_ids(new_ids)
+    if instance.folder_mute:
+        await mute_chats_from_folders(instance.folders)
     log_level = logging.INFO if first_run else logging.DEBUG
     logger.log(
         log_level,
@@ -235,6 +304,7 @@ async def load_instances(config: dict) -> List[Instance]:
             words=inst_cfg.get("words", []),
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
+            folder_mute=inst_cfg.get("folder_mute", False),
         )
         parsed_instances.append(instance)
     return parsed_instances

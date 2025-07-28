@@ -67,3 +67,17 @@ def test_load_instances_backward_compat():
     assert inst.words == ["w"]
     assert inst.target_chat == 2
     assert inst.target_entity is None
+
+
+def test_load_instances_folder_mute():
+    config = {
+        "instances": [
+            {
+                "name": "m",
+                "words": [],
+                "folder_mute": True,
+            }
+        ]
+    }
+    instances = asyncio.run(main.load_instances(config))
+    assert instances[0].folder_mute is True

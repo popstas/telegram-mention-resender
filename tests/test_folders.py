@@ -80,6 +80,31 @@ async def test_update_instance_chat_ids(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_update_instance_chat_ids_mute(monkeypatch):
+    async def fake_get_folders_chat_ids(folders):
+        return set()
+
+    async def fake_resolve_entities(entities):
+        return set()
+
+    called = []
+
+    async def fake_mute(names):
+        called.append(names)
+
+    monkeypatch.setattr(main, "client", SimpleNamespace())
+    monkeypatch.setattr(main, "get_folders_chat_ids", fake_get_folders_chat_ids)
+    monkeypatch.setattr(main, "resolve_entities", fake_resolve_entities)
+    monkeypatch.setattr(main, "mute_chats_from_folders", fake_mute)
+
+    inst = main.Instance(
+        name="i", words=[], target_chat=0, folders=["f"], folder_mute=True
+    )
+    await main.update_instance_chat_ids(inst, True)
+    assert called == [["f"]]
+
+
+@pytest.mark.asyncio
 async def test_get_folders_chat_ids_channel(monkeypatch):
     from telethon import types
 
