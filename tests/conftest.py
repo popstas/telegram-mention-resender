@@ -1,6 +1,6 @@
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,7 +19,7 @@ def dummy_message_cls():
             self.raw_text = text
             self.forwarded: list[int] = []
 
-        async def forward_to(self, target: int):
+        async def forward_to(self, target):
             self.forwarded.append(target)
 
     return DummyMessage
@@ -117,4 +117,3 @@ def dummy_folder_peers_cls(dummy_folder_cls, dummy_peer_cls):
             self.include_peers = [dummy_peer_cls(cid) for cid in peers]
 
     return DummyFolderPeers
-

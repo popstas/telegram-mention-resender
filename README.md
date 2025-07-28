@@ -27,7 +27,7 @@ pip install -r requirements.txt
 - `session` – path to your session file (default is `data/session`).
 - `log_level` – logging level (default is `info`).
 - `instances` – list of monitoring instances. Each instance may contain
-  `folders`, `chat_ids`, `entities`, `words` and `target_chat`.
+  `folders`, `chat_ids`, `entities`, `words`, `target_chat` and `target_entity`.
 
 ## Running
 
