@@ -80,10 +80,10 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     monkeypatch.setattr(main, "load_instances", fake_load_instances)
     monkeypatch.setattr(main, "get_message_source", lambda m: "URL")
 
-    async def fake_get_entity_name(v):
+    async def fake_get_chat_name(v, safe=False):
         return "name"
 
-    monkeypatch.setattr(main, "get_entity_name", fake_get_entity_name)
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
 
     await main.main()
     assert main.config is config

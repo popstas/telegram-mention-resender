@@ -7,7 +7,7 @@ from typing import List, Set
 
 import yaml
 from telethon import TelegramClient, events, functions, types
-from telethon.utils import get_peer_id
+from telethon.utils import get_peer_id, resolve_id
 
 
 def setup_logging(level: str = "info") -> None:
@@ -23,6 +23,12 @@ config: dict = {}
 
 # Cache for entity names by chat_identifier
 entity_name_cache = {}
+
+
+def get_safe_name(name: str) -> str:
+    """Return ``name`` with unsafe characters replaced by underscores."""
+    safe = re.sub(r"[^\w\-_.]", "_", name.strip())
+    return safe or "chat_history"
 
 
 @dataclass
@@ -259,12 +265,16 @@ async def load_instances(config: dict) -> List[Instance]:
     return parsed_instances
 
 
-async def get_entity_name(chat_identifier: str) -> str:
+async def get_chat_name(chat_identifier: str, safe: bool = False) -> str:
     if not chat_identifier:
         return "chat_history"
 
-    # Check cache first
-    if chat_identifier in entity_name_cache:
+    # Check cache first (safe names only for hashable identifiers)
+    if (
+        safe
+        and isinstance(chat_identifier, (int, str))
+        and chat_identifier in entity_name_cache
+    ):
         return entity_name_cache[chat_identifier]
 
     try:
@@ -289,12 +299,14 @@ async def get_entity_name(chat_identifier: str) -> str:
         else:
             name = str(entity.id)
 
-        safe_name = re.sub(r"[^\w\-_.]", "_", name.strip())
-        result = safe_name or "chat_history"
+        safe_name = get_safe_name(name)
 
-        # Cache the result
-        entity_name_cache[chat_identifier] = result
-        return result
+        if safe:
+            if isinstance(chat_identifier, (int, str)):
+                entity_name_cache[chat_identifier] = safe_name
+            return safe_name
+
+        return name.strip() or "chat_history"
 
     except Exception:
         chat = str(chat_identifier)
@@ -305,12 +317,37 @@ async def get_entity_name(chat_identifier: str) -> str:
             if chat.startswith("+"):
                 chat = "invite_" + chat[1:]
 
-        safe_name = re.sub(r"[^\w\-_.]", "_", chat)
-        result = safe_name or "chat_history"
+        safe_name = get_safe_name(chat)
+        if safe:
+            if isinstance(chat_identifier, (int, str)):
+                entity_name_cache[chat_identifier] = safe_name
+            return safe_name
+        return chat or "chat_history"
 
-        # Cache the fallback result too
-        entity_name_cache[chat_identifier] = result
-        return result
+
+async def get_entity_name(peer_id, safe: bool = False) -> str:
+    """Return name for the given ``peer_id``."""
+    if isinstance(peer_id, int):
+        pid, cls = resolve_id(peer_id)
+        if cls == types.PeerChannel:
+            peer = types.PeerChannel(pid)
+        elif cls == types.PeerChat:
+            peer = types.PeerChat(pid)
+        else:
+            peer = types.PeerUser(pid)
+    elif isinstance(peer_id, dict):
+        if "channel_id" in peer_id:
+            peer = types.PeerChannel(peer_id["channel_id"])
+        elif "chat_id" in peer_id:
+            peer = types.PeerChat(peer_id["chat_id"])
+        elif "user_id" in peer_id:
+            peer = types.PeerUser(peer_id["user_id"])
+        else:
+            peer = peer_id
+    else:
+        peer = peer_id
+
+    return await get_chat_name(peer, safe=safe)
 
 
 async def main() -> None:
@@ -336,7 +373,7 @@ async def main() -> None:
             if event.chat_id not in inst.chat_ids:
                 continue
 
-            chat_name = await get_entity_name(event.chat_id)
+            chat_name = await get_chat_name(event.chat_id, safe=True)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
                     source = get_message_source(message)
@@ -344,10 +381,14 @@ async def main() -> None:
                     dest_names = []
                     if inst.target_chat is not None:
                         destinations.append(inst.target_chat)
-                        dest_names.append(await get_entity_name(inst.target_chat))
+                        dest_names.append(
+                            await get_chat_name(inst.target_chat, safe=True)
+                        )
                     if inst.target_entity:
                         destinations.append(inst.target_entity)
-                        dest_names.append(await get_entity_name(inst.target_entity))
+                        dest_names.append(
+                            await get_chat_name(inst.target_entity, safe=True)
+                        )
 
                     for dest, dname in zip(destinations, dest_names):
                         await client.send_message(dest, f"forwarded from: {source}")
