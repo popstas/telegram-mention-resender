@@ -102,17 +102,36 @@ async def list_folders():
 
 
 def get_message_url(message):
+    """Return a t.me URL if the message has ``channel_id``."""
     if isinstance(message.peer_id, dict):
-        chat_id = (
-            message.peer_id.get("channel_id")
-            or message.peer_id.get("chat_id")
-            or message.peer_id.get("user_id")
-        )
+        chat_id = message.peer_id.get("channel_id")
     else:
-        chat_id = message.channel_id or message.chat_id
+        chat_id = getattr(message.peer_id, "channel_id", None)
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
+
+
+def get_message_source(message):
+    """Return URL of the message if available or a textual description."""
+    if isinstance(message.peer_id, dict):
+        channel_id = message.peer_id.get("channel_id")
+    else:
+        channel_id = getattr(message.peer_id, "channel_id", None)
+
+    url = get_message_url(message) if channel_id else None
+    if url:
+        return url
+
+    username = None
+    if hasattr(message, "sender") and getattr(message.sender, "username", None):
+        username = f"@{message.sender.username}"
+
+    group_title = None
+    if hasattr(message, "chat") and getattr(message.chat, "title", None):
+        group_title = message.chat.title
+
+    return f"private [{username}], group [{group_title}]"
 
 
 async def to_event_chat_id(peer) -> int | None:
@@ -320,7 +339,7 @@ async def main() -> None:
             chat_name = await get_entity_name(event.chat_id)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
-                    url = get_message_url(message)
+                    source = get_message_source(message)
                     destinations = []
                     dest_names = []
                     if inst.target_chat is not None:
@@ -331,14 +350,16 @@ async def main() -> None:
                         dest_names.append(await get_entity_name(inst.target_entity))
 
                     for dest, dname in zip(destinations, dest_names):
-                        await client.send_message(dest, f"forwarded from: {url}")
-                        await message.forward_to(dest)
+                        await client.send_message(dest, f"forwarded from: {source}")
+                        forwarded = await message.forward_to(dest)
+                        f_url = get_message_url(forwarded) if forwarded else None
                         logger.info(
-                            "Forwarded message %s from %s to %s for %s",
+                            "Forwarded message %s from %s to %s for %s (target url: %s)",
                             message.id,
                             chat_name,
                             dname,
                             inst.name,
+                            f_url,
                         )
                 except Exception as exc:  # pylint: disable=broad-except
                     logger.error("Failed to forward message: %s", exc)

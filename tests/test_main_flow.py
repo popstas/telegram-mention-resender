@@ -78,7 +78,7 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
         ]
 
     monkeypatch.setattr(main, "load_instances", fake_load_instances)
-    monkeypatch.setattr(main, "get_message_url", lambda m: "URL")
+    monkeypatch.setattr(main, "get_message_source", lambda m: "URL")
 
     async def fake_get_entity_name(v):
         return "name"

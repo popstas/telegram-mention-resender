@@ -24,6 +24,20 @@ def test_get_message_url_dict_peer(dummy_message_cls):
     assert main.get_message_url(msg) == "https://t.me/c/7/123"
 
 
+def test_get_message_source_url(dummy_message_cls):
+    peer = {"channel_id": 8}
+    msg = dummy_message_cls(peer)
+    assert main.get_message_source(msg) == "https://t.me/c/8/123"
+
+
+def test_get_message_source_text(dummy_message_cls):
+    peer = {"chat_id": 9}
+    msg = dummy_message_cls(peer)
+    msg.sender = SimpleNamespace(username="user")
+    msg.chat = SimpleNamespace(title="Group")
+    assert main.get_message_source(msg) == "private [@user], group [Group]"
+
+
 def test_load_instances_direct():
     config = {
         "instances": [
