@@ -24,25 +24,46 @@ def test_get_message_url_peerchannel(dummy_message_cls):
     assert main.get_message_url(msg) == "https://t.me/c/7/123"
 
 
-def test_get_message_source_url(dummy_message_cls):
+@pytest.mark.asyncio
+async def test_get_message_source_url(monkeypatch, dummy_message_cls):
     peer = main.types.PeerChannel(8)
     msg = dummy_message_cls(peer)
-    assert main.get_message_source(msg) == "https://t.me/c/8/123"
+    msg.chat = SimpleNamespace(username="chan")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "chan"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: channel @chan - https://t.me/c/8/123"
 
 
-def test_get_message_source_text(dummy_message_cls):
-    peer = SimpleNamespace(chat_id=9)
+@pytest.mark.asyncio
+async def test_get_message_source_text(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerChat(9)
     msg = dummy_message_cls(peer)
-    msg.sender = SimpleNamespace(username="user")
     msg.chat = SimpleNamespace(title="Group")
-    assert main.get_message_source(msg) == "group Group"
+
+    async def fake_get_chat_name(v, safe=False):
+        return "Group"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: group Group"
 
 
-def test_get_message_source_private(dummy_message_cls):
-    peer = SimpleNamespace(chat_id=10)
+@pytest.mark.asyncio
+async def test_get_message_source_private(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerUser(10)
     msg = dummy_message_cls(peer)
     msg.sender = SimpleNamespace(username="user")
-    assert main.get_message_source(msg) == "private @user"
+
+    async def fake_get_chat_name(v, safe=False):
+        return "user"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: private @user"
 
 
 def test_load_instances_direct():

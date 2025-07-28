@@ -115,22 +115,33 @@ def get_message_url(message):
     return url
 
 
-def get_message_source(message):
-    """Return message URL when possible or a short textual source."""
-    channel_id = getattr(message.peer_id, "channel_id", None)
-    if channel_id:
-        url = get_message_url(message)
-        if url:
-            return url
+async def get_message_source(message):
+    """Return message source with chat type, name, and optional URL."""
+    url = get_message_url(message)
+    peer = message.peer_id
 
-    if hasattr(message, "chat") and getattr(message.chat, "title", None):
-        return f"group {message.chat.title}"
+    if isinstance(peer, types.PeerChannel):
+        chat_type = "channel"
+    elif isinstance(peer, types.PeerChat):
+        chat_type = "group"
+    else:
+        chat_type = "private"
 
-    username = getattr(getattr(message, "sender", None), "username", None)
-    if username:
-        return f"private @{username}"
+    name = await get_chat_name(peer)
 
-    return ""
+    if chat_type == "private":
+        username = getattr(getattr(message, "sender", None), "username", None)
+        if username:
+            name = f"@{username}"
+    else:
+        chat_username = getattr(getattr(message, "chat", None), "username", None)
+        if chat_username:
+            name = f"@{chat_username}"
+
+    result = f"Forwarded from: {chat_type} {name}"
+    if url:
+        result += f" - {url}"
+    return result
 
 
 async def to_event_chat_id(peer) -> int | None:
@@ -360,7 +371,7 @@ async def main() -> None:
             chat_name = await get_chat_name(event.chat_id, safe=True)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
-                    source = get_message_source(message)
+                    source = await get_message_source(message)
                     destinations = []
                     dest_names = []
                     if inst.target_chat is not None:
@@ -375,7 +386,7 @@ async def main() -> None:
                         )
 
                     for dest, dname in zip(destinations, dest_names):
-                        await client.send_message(dest, f"forwarded from: {source}")
+                        await client.send_message(dest, source)
                         forwarded = await message.forward_to(dest)
                         f_url = get_message_url(forwarded) if forwarded else None
                         logger.info(
