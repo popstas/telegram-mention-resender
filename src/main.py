@@ -212,6 +212,7 @@ async def mute_notify_peer(notify_peer) -> None:
 
 
 async def mute_peer_and_topics(peer) -> None:
+    logger.debug("Muting peer %s - %s", peer, await get_entity_name(peer.channel_id))
     try:
         ip = await client.get_input_entity(peer)
     except Exception as exc:  # pylint: disable=broad-except
@@ -220,21 +221,21 @@ async def mute_peer_and_topics(peer) -> None:
 
     await mute_notify_peer(types.InputNotifyPeer(ip))
 
-    try:
-        topics = await client(
-            functions.channels.GetForumTopicsRequest(
-                channel=ip,
-                offset_date=None,
-                offset_id=0,
-                offset_topic=0,
-                limit=100,
-            )
-        )
-        for t in getattr(topics, "topics", []):
-            notify = types.InputNotifyForumTopic(peer=ip, top_msg_id=t.top_message)
-            await mute_notify_peer(notify)
-    except Exception:
-        pass
+    # try:
+    #     topics = await client(
+    #         functions.channels.GetForumTopicsRequest(
+    #             channel=ip,
+    #             offset_date=None,
+    #             offset_id=0,
+    #             offset_topic=0,
+    #             limit=100,
+    #         )
+    #     )
+    #     for t in getattr(topics, "topics", []):
+    #         notify = types.InputNotifyForumTopic(peer=ip, top_msg_id=t.top_message)
+    #         await mute_notify_peer(notify)
+    # except Exception:
+    #     pass
 
 
 async def mute_chats_from_folders(folder_names: List[str]) -> None:
