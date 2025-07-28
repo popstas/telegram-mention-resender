@@ -109,7 +109,7 @@ def get_message_url(message):
             or message.peer_id.get("user_id")
         )
     else:
-        chat_id = message.peer_id.channel_id
+        chat_id = message.chat_id or message.channel_id
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
@@ -278,7 +278,7 @@ async def get_entity_name(chat_identifier: str) -> str:
         return result
 
     except Exception:
-        chat = chat_identifier
+        chat = str(chat_identifier)
         if chat.startswith("@"):
             chat = chat[1:]
         elif "//" in chat:
