@@ -116,21 +116,21 @@ def get_message_url(message):
 
 
 def get_message_source(message):
-    """Return URL of the message if available or a textual description."""
+    """Return message URL when possible or a short textual source."""
     channel_id = getattr(message.peer_id, "channel_id", None)
-    url = get_message_url(message) if channel_id else None
-    if url:
-        return url
+    if channel_id:
+        url = get_message_url(message)
+        if url:
+            return url
 
-    username = None
-    if hasattr(message, "sender") and getattr(message.sender, "username", None):
-        username = f"@{message.sender.username}"
-
-    group_title = None
     if hasattr(message, "chat") and getattr(message.chat, "title", None):
-        group_title = message.chat.title
+        return f"group {message.chat.title}"
 
-    return f"private [{username}], group [{group_title}]"
+    username = getattr(getattr(message, "sender", None), "username", None)
+    if username:
+        return f"private @{username}"
+
+    return ""
 
 
 async def to_event_chat_id(peer) -> int | None:

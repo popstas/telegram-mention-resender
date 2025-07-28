@@ -35,7 +35,14 @@ def test_get_message_source_text(dummy_message_cls):
     msg = dummy_message_cls(peer)
     msg.sender = SimpleNamespace(username="user")
     msg.chat = SimpleNamespace(title="Group")
-    assert main.get_message_source(msg) == "private [@user], group [Group]"
+    assert main.get_message_source(msg) == "group Group"
+
+
+def test_get_message_source_private(dummy_message_cls):
+    peer = SimpleNamespace(chat_id=10)
+    msg = dummy_message_cls(peer)
+    msg.sender = SimpleNamespace(username="user")
+    assert main.get_message_source(msg) == "private @user"
 
 
 def test_load_instances_direct():
