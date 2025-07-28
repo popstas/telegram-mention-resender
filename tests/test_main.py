@@ -35,7 +35,7 @@ async def test_get_message_source_url(monkeypatch, dummy_message_cls):
 
     monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
     res = await main.get_message_source(msg)
-    assert res == "Forwarded from: channel @chan - https://t.me/c/8/123"
+    assert res == "Forwarded from: @chan - https://t.me/c/8/123"
 
 
 @pytest.mark.asyncio
@@ -49,7 +49,7 @@ async def test_get_message_source_text(monkeypatch, dummy_message_cls):
 
     monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
     res = await main.get_message_source(msg)
-    assert res == "Forwarded from: group Group"
+    assert res == "Forwarded from: Group"
 
 
 @pytest.mark.asyncio
