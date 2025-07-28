@@ -18,10 +18,52 @@ def test_get_message_url_object_peer(dummy_message_cls):
     assert main.get_message_url(msg) == "https://t.me/c/42/123"
 
 
-def test_get_message_url_dict_peer(dummy_message_cls):
-    peer = {"channel_id": 7}
+def test_get_message_url_peerchannel(dummy_message_cls):
+    peer = main.types.PeerChannel(7)
     msg = dummy_message_cls(peer)
     assert main.get_message_url(msg) == "https://t.me/c/7/123"
+
+
+@pytest.mark.asyncio
+async def test_get_message_source_url(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerChannel(8)
+    msg = dummy_message_cls(peer)
+    msg.chat = SimpleNamespace(username="chan")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "chan"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: channel @chan - https://t.me/c/8/123"
+
+
+@pytest.mark.asyncio
+async def test_get_message_source_text(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerChat(9)
+    msg = dummy_message_cls(peer)
+    msg.chat = SimpleNamespace(title="Group")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "Group"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: group Group"
+
+
+@pytest.mark.asyncio
+async def test_get_message_source_private(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerUser(10)
+    msg = dummy_message_cls(peer)
+    msg.sender = SimpleNamespace(username="user")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "user"
+
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+    res = await main.get_message_source(msg)
+    assert res == "Forwarded from: private @user"
 
 
 def test_load_instances_direct():

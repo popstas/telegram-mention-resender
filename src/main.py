@@ -7,7 +7,7 @@ from typing import List, Set
 
 import yaml
 from telethon import TelegramClient, events, functions, types
-from telethon.utils import get_peer_id
+from telethon.utils import get_peer_id, resolve_id
 
 
 def setup_logging(level: str = "info") -> None:
@@ -23,6 +23,12 @@ config: dict = {}
 
 # Cache for entity names by chat_identifier
 entity_name_cache = {}
+
+
+def get_safe_name(name: str) -> str:
+    """Return ``name`` with unsafe characters replaced by underscores."""
+    safe = re.sub(r"[^\w\-_.]", "_", name.strip())
+    return safe or "chat_history"
 
 
 @dataclass
@@ -105,23 +111,40 @@ async def list_folders():
 
 
 def get_message_url(message):
-    peer = getattr(message, "peer_id", None)
-    chat_id = None
-    if isinstance(peer, dict):
-        chat_id = peer.get("channel_id") or peer.get("chat_id") or peer.get("user_id")
-    elif peer is not None:
-        chat_id = (
-            getattr(peer, "channel_id", None)
-            or getattr(peer, "chat_id", None)
-            or getattr(peer, "user_id", None)
-        )
-    if chat_id is None:
-        chat_id = getattr(message, "channel_id", None) or getattr(
-            message, "chat_id", None
-        )
+    """Return a t.me URL if the message has ``channel_id``."""
+    chat_id = getattr(message.peer_id, "channel_id", None)
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
+
+
+async def get_message_source(message):
+    """Return message source with chat type, name, and optional URL."""
+    url = get_message_url(message)
+    peer = message.peer_id
+
+    if isinstance(peer, types.PeerChannel):
+        chat_type = "channel"
+    elif isinstance(peer, types.PeerChat):
+        chat_type = "group"
+    else:
+        chat_type = "private"
+
+    name = await get_chat_name(peer)
+
+    if chat_type == "private":
+        username = getattr(getattr(message, "sender", None), "username", None)
+        if username:
+            name = f"@{username}"
+    else:
+        chat_username = getattr(getattr(message, "chat", None), "username", None)
+        if chat_username:
+            name = f"@{chat_username}"
+
+    result = f"Forwarded from: {chat_type} {name}"
+    if url:
+        result += f" - {url}"
+    return result
 
 
 async def to_event_chat_id(peer) -> int | None:
@@ -311,12 +334,16 @@ async def load_instances(config: dict) -> List[Instance]:
     return parsed_instances
 
 
-async def get_entity_name(chat_identifier: str) -> str:
+async def get_chat_name(chat_identifier: str, safe: bool = False) -> str:
     if not chat_identifier:
         return "chat_history"
 
-    # Check cache first
-    if chat_identifier in entity_name_cache:
+    # Check cache first (safe names only for hashable identifiers)
+    if (
+        safe
+        and isinstance(chat_identifier, (int, str))
+        and chat_identifier in entity_name_cache
+    ):
         return entity_name_cache[chat_identifier]
 
     try:
@@ -341,12 +368,14 @@ async def get_entity_name(chat_identifier: str) -> str:
         else:
             name = str(entity.id)
 
-        safe_name = re.sub(r"[^\w\-_.]", "_", name.strip())
-        result = safe_name or "chat_history"
+        safe_name = get_safe_name(name)
 
-        # Cache the result
-        entity_name_cache[chat_identifier] = result
-        return result
+        if safe:
+            if isinstance(chat_identifier, (int, str)):
+                entity_name_cache[chat_identifier] = safe_name
+            return safe_name
+
+        return name.strip() or "chat_history"
 
     except Exception:
         chat = str(chat_identifier)
@@ -357,12 +386,28 @@ async def get_entity_name(chat_identifier: str) -> str:
             if chat.startswith("+"):
                 chat = "invite_" + chat[1:]
 
-        safe_name = re.sub(r"[^\w\-_.]", "_", chat)
-        result = safe_name or "chat_history"
+        safe_name = get_safe_name(chat)
+        if safe:
+            if isinstance(chat_identifier, (int, str)):
+                entity_name_cache[chat_identifier] = safe_name
+            return safe_name
+        return chat or "chat_history"
 
-        # Cache the fallback result too
-        entity_name_cache[chat_identifier] = result
-        return result
+
+async def get_entity_name(peer_id, safe: bool = False) -> str:
+    """Return name for the given ``peer_id``."""
+    if isinstance(peer_id, int):
+        pid, cls = resolve_id(peer_id)
+        if cls == types.PeerChannel:
+            peer = types.PeerChannel(pid)
+        elif cls == types.PeerChat:
+            peer = types.PeerChat(pid)
+        else:
+            peer = types.PeerUser(pid)
+    else:
+        peer = peer_id
+
+    return await get_chat_name(peer, safe=safe)
 
 
 async def main() -> None:
@@ -388,28 +433,34 @@ async def main() -> None:
             if event.chat_id not in inst.chat_ids:
                 continue
 
-            chat_name = await get_entity_name(event.chat_id)
+            chat_name = await get_chat_name(event.chat_id, safe=True)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
-                    url = get_message_url(message)
+                    source = await get_message_source(message)
                     destinations = []
                     dest_names = []
                     if inst.target_chat is not None:
                         destinations.append(inst.target_chat)
-                        dest_names.append(await get_entity_name(inst.target_chat))
+                        dest_names.append(
+                            await get_chat_name(inst.target_chat, safe=True)
+                        )
                     if inst.target_entity:
                         destinations.append(inst.target_entity)
-                        dest_names.append(await get_entity_name(inst.target_entity))
+                        dest_names.append(
+                            await get_chat_name(inst.target_entity, safe=True)
+                        )
 
                     for dest, dname in zip(destinations, dest_names):
-                        await client.send_message(dest, f"forwarded from: {url}")
-                        await message.forward_to(dest)
+                        await client.send_message(dest, source)
+                        forwarded = await message.forward_to(dest)
+                        f_url = get_message_url(forwarded) if forwarded else None
                         logger.info(
-                            "Forwarded message %s from %s to %s for %s",
+                            "Forwarded message %s from %s to %s for %s (target url: %s)",
                             message.id,
                             chat_name,
                             dname,
                             inst.name,
+                            f_url,
                         )
                 except Exception as exc:  # pylint: disable=broad-except
                     logger.error("Failed to forward message: %s", exc)
