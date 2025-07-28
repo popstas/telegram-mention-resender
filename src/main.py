@@ -109,10 +109,7 @@ async def list_folders():
 
 def get_message_url(message):
     """Return a t.me URL if the message has ``channel_id``."""
-    if isinstance(message.peer_id, dict):
-        chat_id = message.peer_id.get("channel_id")
-    else:
-        chat_id = getattr(message.peer_id, "channel_id", None)
+    chat_id = getattr(message.peer_id, "channel_id", None)
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
@@ -120,11 +117,7 @@ def get_message_url(message):
 
 def get_message_source(message):
     """Return URL of the message if available or a textual description."""
-    if isinstance(message.peer_id, dict):
-        channel_id = message.peer_id.get("channel_id")
-    else:
-        channel_id = getattr(message.peer_id, "channel_id", None)
-
+    channel_id = getattr(message.peer_id, "channel_id", None)
     url = get_message_url(message) if channel_id else None
     if url:
         return url
@@ -335,15 +328,6 @@ async def get_entity_name(peer_id, safe: bool = False) -> str:
             peer = types.PeerChat(pid)
         else:
             peer = types.PeerUser(pid)
-    elif isinstance(peer_id, dict):
-        if "channel_id" in peer_id:
-            peer = types.PeerChannel(peer_id["channel_id"])
-        elif "chat_id" in peer_id:
-            peer = types.PeerChat(peer_id["chat_id"])
-        elif "user_id" in peer_id:
-            peer = types.PeerUser(peer_id["user_id"])
-        else:
-            peer = peer_id
     else:
         peer = peer_id
 
