@@ -31,7 +31,8 @@ class Instance:
 
     name: str
     words: List[str]
-    target_chat: int
+    target_chat: int | None = None
+    target_entity: str | None = None
     folders: List[str] = field(default_factory=list)
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
@@ -108,7 +109,7 @@ def get_message_url(message):
             or message.peer_id.get("user_id")
         )
     else:
-        chat_id = message.peer_id.channel_id
+        chat_id = message.chat_id or message.channel_id
     msg_id = message.id
     url = f"https://t.me/c/{chat_id}/{msg_id}" if chat_id and msg_id else None
     return url
@@ -219,6 +220,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "entities": config.get("entities", []),
                     "words": config.get("words", []),
                     "target_chat": config.get("target_chat"),
+                    "target_entity": config.get("target_entity"),
                 }
             ]
         }
@@ -232,6 +234,7 @@ async def load_instances(config: dict) -> List[Instance]:
             entities=inst_cfg.get("entities", []),
             words=inst_cfg.get("words", []),
             target_chat=inst_cfg.get("target_chat"),
+            target_entity=inst_cfg.get("target_entity"),
         )
         parsed_instances.append(instance)
     return parsed_instances
@@ -275,7 +278,7 @@ async def get_entity_name(chat_identifier: str) -> str:
         return result
 
     except Exception:
-        chat = chat_identifier
+        chat = str(chat_identifier)
         if chat.startswith("@"):
             chat = chat[1:]
         elif "//" in chat:
@@ -315,21 +318,28 @@ async def main() -> None:
                 continue
 
             chat_name = await get_entity_name(event.chat_id)
-            target_chat_name = await get_entity_name(inst.target_chat)
             if message.raw_text and word_in_text(inst.words, message.raw_text):
                 try:
                     url = get_message_url(message)
-                    await client.send_message(
-                        inst.target_chat, f"forwarded from: {url}"
-                    )
-                    await message.forward_to(inst.target_chat)
-                    logger.info(
-                        "Forwarded message %s from %s to %s for %s",
-                        message.id,
-                        chat_name,
-                        target_chat_name,
-                        inst.name,
-                    )
+                    destinations = []
+                    dest_names = []
+                    if inst.target_chat is not None:
+                        destinations.append(inst.target_chat)
+                        dest_names.append(await get_entity_name(inst.target_chat))
+                    if inst.target_entity:
+                        destinations.append(inst.target_entity)
+                        dest_names.append(await get_entity_name(inst.target_entity))
+
+                    for dest, dname in zip(destinations, dest_names):
+                        await client.send_message(dest, f"forwarded from: {url}")
+                        await message.forward_to(dest)
+                        logger.info(
+                            "Forwarded message %s from %s to %s for %s",
+                            message.id,
+                            chat_name,
+                            dname,
+                            inst.name,
+                        )
                 except Exception as exc:  # pylint: disable=broad-except
                     logger.error("Failed to forward message: %s", exc)
             else:

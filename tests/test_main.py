@@ -12,8 +12,6 @@ def test_word_in_text_basic():
     assert main.word_in_text(words, "no match") is False
 
 
-
-
 def test_get_message_url_object_peer(dummy_message_cls):
     peer = SimpleNamespace(channel_id=42)
     msg = dummy_message_cls(peer)
@@ -36,6 +34,7 @@ def test_load_instances_direct():
                 "entities": ["e"],
                 "words": ["w"],
                 "target_chat": 2,
+                "target_entity": "@test",
             }
         ]
     }
@@ -48,6 +47,7 @@ def test_load_instances_direct():
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
     assert inst.target_chat == 2
+    assert inst.target_entity == "@test"
 
 
 def test_load_instances_backward_compat():
@@ -66,5 +66,4 @@ def test_load_instances_backward_compat():
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
     assert inst.target_chat == 2
-
-
+    assert inst.target_entity is None

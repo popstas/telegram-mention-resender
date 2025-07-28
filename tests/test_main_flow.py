@@ -73,7 +73,9 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     monkeypatch.setattr(main, "update_instance_chat_ids", fake_update)
 
     async def fake_load_instances(cfg):
-        return [main.Instance(name="i", words=["hi"], target_chat=99)]
+        return [
+            main.Instance(name="i", words=["hi"], target_chat=99, target_entity="name")
+        ]
 
     monkeypatch.setattr(main, "load_instances", fake_load_instances)
     monkeypatch.setattr(main, "get_message_url", lambda m: "URL")
@@ -90,5 +92,6 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="hi there")
     event = SimpleNamespace(message=msg, chat_id=1)
     await handler(event)
-    assert msg.forwarded == [99]
+    assert msg.forwarded == [99, "name"]
     assert dummy_client.sent[0][0][0] == 99
+    assert dummy_client.sent[1][0][0] == "name"

@@ -9,3 +9,4 @@ instances:
     folders: []
     words: ["my username"]
     target_chat: 0
+    target_entity: ""
