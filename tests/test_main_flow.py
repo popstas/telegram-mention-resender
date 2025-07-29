@@ -133,7 +133,7 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
     async def fake_match(prompt, text, inst_name):
         assert prompt.prompt == "hi"
         assert inst_name == "p"
-        return 5
+        return main.EvaluateResult(similarity=5, main_fragment="")
 
     async def fake_get_message_source(msg):
         return "src"

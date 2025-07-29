@@ -158,7 +158,7 @@ async def test_match_prompt(monkeypatch):
     main.config["openai_api_key"] = "k"
     prompt = main.Prompt(name="p1", prompt="p1", threshold=2)
     result = await main.match_prompt(prompt, "msg", "i")
-    assert result == 3
+    assert result.similarity == 3
     assert calls == ["p1"]
 
 
@@ -167,7 +167,7 @@ async def test_match_prompt_no_api(monkeypatch):
     main.config["openai_api_key"] = ""
     prompt = main.Prompt(name="n", prompt="hello")
     result = await main.match_prompt(prompt, "msg")
-    assert result == 0
+    assert result == main.EvaluateResult(similarity=0, main_fragment="")
 
 
 def test_get_forward_reason_text_word():
