@@ -75,8 +75,9 @@ def test_load_instances_direct():
                 "chat_ids": [1],
                 "entities": ["e"],
                 "words": ["w"],
-                "prompts": ["p"],
-                "prompt_threshold": 3,
+                "prompts": [
+                    {"name": "p", "prompt": "p", "threshold": 3}
+                ],
                 "target_chat": 2,
                 "target_entity": "@test",
             }
@@ -90,8 +91,11 @@ def test_load_instances_direct():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
-    assert inst.prompts == ["p"]
-    assert inst.prompt_threshold == 3
+    assert len(inst.prompts) == 1
+    p = inst.prompts[0]
+    assert p.name == "p"
+    assert p.prompt == "p"
+    assert p.threshold == 3
     assert inst.target_chat == 2
     assert inst.target_entity == "@test"
 
@@ -112,7 +116,6 @@ def test_load_instances_backward_compat():
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
     assert inst.prompts == []
-    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity is None
 
@@ -132,20 +135,17 @@ def test_load_instances_folder_mute():
 
 
 @pytest.mark.asyncio
-async def test_match_prompts_iter(monkeypatch):
+async def test_match_prompt(monkeypatch):
     calls = []
 
     class DummyCompletions:
         def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
             prompt = messages[0]["content"].split("\n", 1)[0]
             calls.append(prompt)
-            score = {"p1": 3, "p2": 5}[prompt]
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(
-                            parsed=SimpleNamespace(similarity=score)
-                        )
+                        message=SimpleNamespace(parsed=SimpleNamespace(similarity=3))
                     )
                 ]
             )
@@ -156,36 +156,39 @@ async def test_match_prompts_iter(monkeypatch):
 
     monkeypatch.setattr(main, "OpenAI", DummyClient)
     main.config["openai_api_key"] = "k"
-    result = await main.match_prompts(["p1", "p2"], "msg", 4, "i")
-    assert result == 5
-    assert calls == ["p1", "p2"]
+    prompt = main.Prompt(name="p1", prompt="p1", threshold=2)
+    result = await main.match_prompt(prompt, "msg", "i")
+    assert result == 3
+    assert calls == ["p1"]
 
 
 @pytest.mark.asyncio
-async def test_match_prompts_iter_stop(monkeypatch):
-    calls = []
+async def test_match_prompt_no_api(monkeypatch):
+    main.config["openai_api_key"] = ""
+    prompt = main.Prompt(name="n", prompt="hello")
+    result = await main.match_prompt(prompt, "msg")
+    assert result == 0
 
-    class DummyCompletions:
-        def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
-            prompt = messages[0]["content"].split("\n", 1)[0]
-            calls.append(prompt)
-            score = {"p1": 5, "p2": 0}[prompt]
-            return SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        message=SimpleNamespace(
-                            parsed=SimpleNamespace(similarity=score)
-                        )
-                    )
-                ]
-            )
 
-    class DummyClient:
-        def __init__(self, api_key=None, http_client=None):  # noqa: D401 - test stub
-            self.chat = SimpleNamespace(completions=DummyCompletions())
+def test_get_forward_reason_text_word():
+    assert main.get_forward_reason_text(word="hi") == "word: hi"
 
-    monkeypatch.setattr(main, "OpenAI", DummyClient)
-    main.config["openai_api_key"] = "k"
-    result = await main.match_prompts(["p1", "p2"], "msg", 4, "i")
-    assert result == 5
-    assert calls == ["p1"]
+
+def test_get_forward_reason_text_prompt():
+    p = main.Prompt(name="n", prompt="p", threshold=4)
+    assert main.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
+
+
+@pytest.mark.asyncio
+async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerChannel(1)
+    msg = dummy_message_cls(peer)
+
+    async def fake_get_message_source(m):
+        return "src"
+
+    monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
+    text = await main.get_forward_message_text(
+        msg, prompt=main.Prompt(name="n", prompt="p"), score=4
+    )
+    assert text == "n: 4/5\nsrc"

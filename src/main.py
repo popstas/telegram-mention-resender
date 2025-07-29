@@ -42,6 +42,15 @@ def get_safe_name(name: str) -> str:
 
 
 @dataclass
+class Prompt:
+    """Prompt description for LLM evaluation."""
+
+    name: str | None = None
+    prompt: str | None = None
+    threshold: int = 4
+
+
+@dataclass
 class Instance:
     """Configuration for a single monitoring instance."""
 
@@ -53,8 +62,7 @@ class Instance:
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
     folder_mute: bool = False
-    prompts: List[str] = field(default_factory=list)
-    prompt_threshold: int = 4
+    prompts: List[Prompt] = field(default_factory=list)
 
 
 instances: List[Instance] = []
@@ -152,11 +160,18 @@ def word_in_text(words: List[str], text: str) -> bool:
     return any(word.lower() in text_lower for word in words)
 
 
-async def match_prompts(
-    prompts: List[str], text: str, threshold: int, inst_name: str | None = None
-) -> int:
+def find_word(words: List[str], text: str) -> str | None:
+    """Return the first matching word found in text."""
+    text_lower = text.lower()
+    for word in words:
+        if word.lower() in text_lower:
+            return word
+    return None
+
+
+async def match_prompt(prompt: Prompt, text: str, inst_name: str | None = None) -> int:
     """Return similarity score from 0 to 5 for ``text`` using OpenAI."""
-    if not prompts or not config.get("openai_api_key"):
+    if not prompt.prompt or not config.get("openai_api_key"):
         return 0
 
     class EvaluateResult(BaseModel):
@@ -167,38 +182,32 @@ async def match_prompts(
     client = OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
-    best = 0
-    for prompt in prompts:
-        messages = [
-            {
-                "role": "system",
-                "content": f"{prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
-            },
-            {
-                "role": "user",
-                "content": text,
-            },
-        ]
-        try:
-            completion = await asyncio.to_thread(
-                client.chat.completions.parse,
-                model=model,
-                messages=messages,
-                response_format=EvaluateResult,
-            )
-            similarity = completion.choices[0].message.parsed.similarity
-            tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
-            if inst_name:
-                stats.add_tokens(inst_name, tokens)
-        except Exception as exc:  # pragma: no cover - external call
-            logger.error("Failed to query OpenAI: %s", exc)
-            similarity = 0
-        logger.debug("Prompt check: %s -> %s", prompt, similarity)
-        best = max(best, similarity)
-        if similarity >= threshold:
-            return similarity
-
-    return best
+    messages = [
+        {
+            "role": "system",
+            "content": f"{prompt.prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
+        },
+        {
+            "role": "user",
+            "content": text,
+        },
+    ]
+    try:
+        completion = await asyncio.to_thread(
+            client.chat.completions.parse,
+            model=model,
+            messages=messages,
+            response_format=EvaluateResult,
+        )
+        similarity = completion.choices[0].message.parsed.similarity
+        tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
+        if inst_name:
+            stats.add_tokens(inst_name, tokens)
+    except Exception as exc:  # pragma: no cover - external call
+        logger.error("Failed to query OpenAI: %s", exc)
+        similarity = 0
+    logger.debug("Prompt check: %s -> %s", prompt.name, similarity)
+    return similarity
 
 
 async def get_folder(folders, folder_name):
@@ -271,6 +280,29 @@ async def get_message_source(message):
     if url:
         result += f" - {url}"
     return result
+
+
+def get_forward_reason_text(
+    *, prompt: Prompt | None = None, score: int | None = None, word: str | None = None
+) -> str:
+    """Return human-readable reason for forwarding a message."""
+    if word:
+        return f"word: {word}"
+    if prompt is not None and score is not None:
+        name = prompt.name or "prompt"
+        return f"{name}: {score}/5"
+    return ""
+
+
+async def get_forward_message_text(
+    message, *, prompt: Prompt | None = None, score: int | None = None, word: str | None = None
+) -> str:
+    """Return text to send before forwarding ``message``."""
+    reason = get_forward_reason_text(prompt=prompt, score=score, word=word)
+    source = await get_message_source(message)
+    if reason:
+        return f"{reason}\n{source}"
+    return source
 
 
 async def to_event_chat_id(peer) -> int | None:
@@ -446,6 +478,20 @@ async def load_instances(config: dict) -> List[Instance]:
 
     parsed_instances: List[Instance] = []
     for inst_cfg in config.get("instances", []):
+        raw_prompts = inst_cfg.get("prompts", [])
+        parsed_prompts: List[Prompt] = []
+        for p in raw_prompts:
+            if isinstance(p, dict):
+                parsed_prompts.append(
+                    Prompt(
+                        name=p.get("name"),
+                        prompt=p.get("prompt"),
+                        threshold=p.get("threshold", 4),
+                    )
+                )
+            else:
+                parsed_prompts.append(Prompt(prompt=p))
+
         instance = Instance(
             name=inst_cfg.get("name", "instance"),
             folders=inst_cfg.get("folders", []),
@@ -455,8 +501,7 @@ async def load_instances(config: dict) -> List[Instance]:
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
-            prompts=inst_cfg.get("prompts", []),
-            prompt_threshold=inst_cfg.get("prompt_threshold", 4),
+            prompts=parsed_prompts,
         )
         parsed_instances.append(instance)
     return parsed_instances
@@ -544,18 +589,29 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
     message = event.message
     chat_name = await get_chat_name(event.chat_id, safe=True)
     forward = False
+    used_word: str | None = None
+    used_prompt: Prompt | None = None
+    used_score = 0
+
     if message.raw_text:
-        if word_in_text(inst.words, message.raw_text):
+        w = find_word(inst.words, message.raw_text)
+        if w:
             forward = True
-        elif inst.prompts:
-            score = await match_prompts(
-                inst.prompts, message.raw_text, inst.prompt_threshold, inst.name
-            )
-            if score >= inst.prompt_threshold:
-                forward = True
+            used_word = w
+        else:
+            for p in inst.prompts:
+                sc = await match_prompt(p, message.raw_text, inst.name)
+                if sc > used_score:
+                    used_score = sc
+                    used_prompt = p
+                if sc >= (p.threshold or 4):
+                    forward = True
+                    break
     if forward:
         try:
-            source = await get_message_source(message)
+            text = await get_forward_message_text(
+                message, prompt=used_prompt, score=used_score, word=used_word
+            )
             destinations = []
             dest_names = []
             if inst.target_chat is not None:
@@ -565,7 +621,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                 destinations.append(inst.target_entity)
                 dest_names.append(await get_chat_name(inst.target_entity, safe=True))
             for dest, dname in zip(destinations, dest_names):
-                await client.send_message(dest, source)
+                await client.send_message(dest, text)
                 forwarded = await message.forward_to(dest)
                 f_url = get_message_url(forwarded) if forwarded else None
                 logger.info(

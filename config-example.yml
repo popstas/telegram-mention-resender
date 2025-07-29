@@ -11,7 +11,9 @@ instances:
     folders: []
     folder_mute: false
     words: ["my username"]
-    prompts: []
-    prompt_threshold: 4
+    prompts:
+      - name: example
+        prompt: Сообщение содержит недовольство.
+        threshold: 4
     target_chat: 0
     target_entity: ""
