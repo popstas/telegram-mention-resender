@@ -2,6 +2,8 @@ api_id: 0
 api_hash: ""
 session: data/session
 log_level: info
+openai_api_key: ""
+openai_model: gpt-4.1-mini
 instances:
   - name: default
     entities:
@@ -9,5 +11,7 @@ instances:
     folders: []
     folder_mute: false
     words: ["my username"]
+    prompts: []
+    prompt_threshold: 4
     target_chat: 0
     target_entity: ""
