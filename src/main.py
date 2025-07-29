@@ -134,6 +134,13 @@ stats = StatsTracker(STATS_PATH)
 atexit.register(stats.flush)
 
 
+class EvaluateResult(BaseModel):
+    """Result returned by LLM evaluation."""
+
+    similarity: int
+    main_fragment: str = ""
+
+
 def load_config() -> dict:
     """Load YAML configuration from CONFIG_PATH."""
     if not os.path.exists(CONFIG_PATH):
@@ -169,13 +176,12 @@ def find_word(words: List[str], text: str) -> str | None:
     return None
 
 
-async def match_prompt(prompt: Prompt, text: str, inst_name: str | None = None) -> int:
-    """Return similarity score from 0 to 5 for ``text`` using OpenAI."""
+async def match_prompt(
+    prompt: Prompt, text: str, inst_name: str | None = None
+) -> EvaluateResult:
+    """Return :class:`EvaluateResult` for ``text`` using OpenAI."""
     if not prompt.prompt or not config.get("openai_api_key"):
-        return 0
-
-    class EvaluateResult(BaseModel):
-        similarity: int
+        return EvaluateResult(similarity=0, main_fragment="")
 
     proxy = config.get("proxy_url")
     http_client = httpx.Client(proxy=proxy) if proxy else None
@@ -185,7 +191,10 @@ async def match_prompt(prompt: Prompt, text: str, inst_name: str | None = None) 
     messages = [
         {
             "role": "system",
-            "content": f"{prompt.prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
+            "content": (
+                f"{prompt.prompt}\n\n" "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
+                "Cite most similar text fragment."
+            ),
         },
         {
             "role": "user",
@@ -199,15 +208,15 @@ async def match_prompt(prompt: Prompt, text: str, inst_name: str | None = None) 
             messages=messages,
             response_format=EvaluateResult,
         )
-        similarity = completion.choices[0].message.parsed.similarity
+        result = completion.choices[0].message.parsed
         tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
         if inst_name:
             stats.add_tokens(inst_name, tokens)
     except Exception as exc:  # pragma: no cover - external call
         logger.error("Failed to query OpenAI: %s", exc)
-        similarity = 0
-    logger.debug("Prompt check: %s -> %s", prompt.name, similarity)
-    return similarity
+        result = EvaluateResult(similarity=0, main_fragment="")
+    logger.debug("Prompt check: %s -> %s", prompt.name, result.similarity)
+    return result
 
 
 async def get_folder(folders, folder_name):
@@ -283,22 +292,36 @@ async def get_message_source(message):
 
 
 def get_forward_reason_text(
-    *, prompt: Prompt | None = None, score: int | None = None, word: str | None = None
+    *,
+    prompt: Prompt | None = None,
+    score: int | None = None,
+    word: str | None = None,
+    fragment: str | None = None,
 ) -> str:
     """Return human-readable reason for forwarding a message."""
     if word:
         return f"word: {word}"
     if prompt is not None and score is not None:
         name = prompt.name or "prompt"
-        return f"{name}: {score}/5"
+        reason = f"{name}: {score}/5"
+        if fragment:
+            reason += f" - {fragment}"
+        return reason
     return ""
 
 
 async def get_forward_message_text(
-    message, *, prompt: Prompt | None = None, score: int | None = None, word: str | None = None
+    message,
+    *,
+    prompt: Prompt | None = None,
+    score: int | None = None,
+    word: str | None = None,
+    fragment: str | None = None,
 ) -> str:
     """Return text to send before forwarding ``message``."""
-    reason = get_forward_reason_text(prompt=prompt, score=score, word=word)
+    reason = get_forward_reason_text(
+        prompt=prompt, score=score, word=word, fragment=fragment
+    )
     source = await get_message_source(message)
     if reason:
         return f"{reason}\n{source}"
@@ -592,6 +615,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
     used_word: str | None = None
     used_prompt: Prompt | None = None
     used_score = 0
+    used_fragment: str | None = None
 
     if message.raw_text:
         w = find_word(inst.words, message.raw_text)
@@ -600,17 +624,23 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             used_word = w
         else:
             for p in inst.prompts:
-                sc = await match_prompt(p, message.raw_text, inst.name)
+                res = await match_prompt(p, message.raw_text, inst.name)
+                sc = res.similarity
                 if sc > used_score:
                     used_score = sc
                     used_prompt = p
+                    used_fragment = res.main_fragment
                 if sc >= (p.threshold or 4):
                     forward = True
                     break
     if forward:
         try:
             text = await get_forward_message_text(
-                message, prompt=used_prompt, score=used_score, word=used_word
+                message,
+                prompt=used_prompt,
+                score=used_score,
+                word=used_word,
+                fragment=used_fragment,
             )
             destinations = []
             dest_names = []
