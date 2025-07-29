@@ -1,3 +1,12 @@
+## Rules on new features:
+- Add tests for new features.
+- Update README.md after features changes.
+- If config type was changed, change config.ts generateConfig function.
+
+## Rules before commit
+- Always run `pre-commit --all-files` before commit.
+- Update AGENTS.md when project structure changes.
+
 # Repository Overview
 
 This project forwards Telegram messages that match specific rules to a target chat. The application is implemented in **src/main.py** and uses [Telethon](https://github.com/LonamiWebs/Telethon). Configuration is stored in YAML under `data/config.yml` (see `config-example.yml` for reference).
