@@ -12,6 +12,7 @@ instances:
     folders: []
     folder_mute: false
     words: ["my username"]
+    ignore_words: []
     prompts:
       - name: example
         prompt: Сообщение содержит недовольство.
