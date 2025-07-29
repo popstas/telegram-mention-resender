@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 import yaml
+from openai import OpenAI
+from pydantic import BaseModel
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id, resolve_id
 
@@ -139,9 +141,6 @@ async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
     if not prompts or not config.get("openai_api_key"):
         return 0
 
-    from openai import OpenAI
-    from pydantic import BaseModel
-
     class EvaluateResult(BaseModel):
         similarity: int
 
@@ -151,13 +150,13 @@ async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
     best = 0
     for prompt in prompts:
         messages = [
-            {"role": "system", "content": prompt},
+            {
+                "role": "system",
+                "content": f"{prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
+            },
             {
                 "role": "user",
-                "content": (
-                    "return only number of similarity: 0 - not match at all, 5 - strongly match. "
-                    f"Message: {text}"
-                ),
+                "content": text,
             },
         ]
         try:
@@ -165,7 +164,7 @@ async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
                 client.chat.completions.parse,
                 model=model,
                 messages=messages,
-                response_model=EvaluateResult,
+                response_format=EvaluateResult,
             )
             similarity = completion.choices[0].message.parsed.similarity
         except Exception as exc:  # pragma: no cover - external call
