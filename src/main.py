@@ -1,11 +1,11 @@
 import asyncio
+import atexit
+import datetime
+import json
 import logging
 import os
 import re
-import json
 import time
-import atexit
-import datetime
 from dataclasses import dataclass, field
 from typing import List, Set
 
@@ -85,7 +85,7 @@ class StatsTracker:
         inst = self._get_inst(name)
         self.data["total"] = self.data.get("total", 0) + 1
         inst["total"] = inst.get("total", 0) + 1
-        day = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        day = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
         inst["days"][day] = inst["days"].get(day, 0) + 1
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:
@@ -94,6 +94,7 @@ class StatsTracker:
     def flush(self) -> None:
         if not self.dirty:
             return
+        logger.debug("Flushing stats to %s", self.path)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=4)
