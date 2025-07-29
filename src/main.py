@@ -9,9 +9,9 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Set
 
+import httpx
 import yaml
 from openai import OpenAI
-import httpx
 from pydantic import BaseModel
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id, resolve_id
@@ -22,6 +22,9 @@ def setup_logging(level: str = "info") -> None:
     numeric_level = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(level=numeric_level, format="%(levelname)s - %(message)s")
     logging.getLogger("telethon").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
 
 
 logger = logging.getLogger(__name__)
@@ -160,7 +163,7 @@ async def match_prompts(
         similarity: int
 
     proxy = config.get("proxy_url")
-    http_client = httpx.Client(proxies=proxy) if proxy else None
+    http_client = httpx.Client(proxy=proxy) if proxy else None
     client = OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
@@ -190,6 +193,7 @@ async def match_prompts(
         except Exception as exc:  # pragma: no cover - external call
             logger.error("Failed to query OpenAI: %s", exc)
             similarity = 0
+        logger.debug("Prompt check: %s -> %s", prompt, similarity)
         best = max(best, similarity)
         if similarity >= threshold:
             return similarity
