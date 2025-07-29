@@ -75,9 +75,7 @@ def test_load_instances_direct():
                 "chat_ids": [1],
                 "entities": ["e"],
                 "words": ["w"],
-                "prompts": [
-                    {"name": "p", "prompt": "p", "threshold": 3}
-                ],
+                "prompts": [{"name": "p", "prompt": "p", "threshold": 3}],
                 "target_chat": 2,
                 "target_entity": "@test",
             }
@@ -134,12 +132,31 @@ def test_load_instances_folder_mute():
     assert instances[0].folder_mute is True
 
 
+def test_load_instances_ignore_words():
+    config = {"instances": [{"name": "i", "words": [], "ignore_words": ["bad"]}]}
+    instances = asyncio.run(main.load_instances(config))
+    assert instances[0].ignore_words == ["bad"]
+
+
+def test_load_instances_ignore_words_backward():
+    config = {"words": [], "ignore_words": ["bad"]}
+    instances = asyncio.run(main.load_instances(config))
+    assert instances[0].ignore_words == ["bad"]
+
+
 @pytest.mark.asyncio
 async def test_match_prompt(monkeypatch):
     calls = []
 
     class DummyCompletions:
-        def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
+        def parse(
+            self,
+            *,
+            model=None,
+            messages=None,
+            response_format=None,
+            response_model=None,
+        ):  # noqa: D401 - test stub
             prompt = messages[0]["content"].split("\n", 1)[0]
             calls.append(prompt)
             return SimpleNamespace(

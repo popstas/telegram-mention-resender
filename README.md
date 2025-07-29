@@ -28,7 +28,7 @@ pip install -r requirements.txt
 - `log_level` – logging level (default is `info`).
 - `ignore_usernames` – list of usernames to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
-  `folders`, `chat_ids`, `entities`, `words`, `target_chat`,
+  `folders`, `chat_ids`, `entities`, `words`, `ignore_words`, `target_chat`,
   `target_entity` and `folder_mute`.
 
 ## Running

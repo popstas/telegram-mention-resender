@@ -56,6 +56,7 @@ class Instance:
 
     name: str
     words: List[str]
+    ignore_words: List[str] = field(default_factory=list)
     target_chat: int | None = None
     target_entity: str | None = None
     folders: List[str] = field(default_factory=list)
@@ -494,6 +495,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "chat_ids": config.get("chat_ids", []),
                     "entities": config.get("entities", []),
                     "words": config.get("words", []),
+                    "ignore_words": config.get("ignore_words", []),
                     "target_chat": config.get("target_chat"),
                     "target_entity": config.get("target_entity"),
                 }
@@ -522,6 +524,7 @@ async def load_instances(config: dict) -> List[Instance]:
             chat_ids=set(inst_cfg.get("chat_ids", [])),
             entities=inst_cfg.get("entities", []),
             words=inst_cfg.get("words", []),
+            ignore_words=inst_cfg.get("ignore_words", []),
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
@@ -609,8 +612,15 @@ async def get_entity_name(peer_id, safe: bool = False) -> str:
 
 async def process_message(inst: Instance, event: events.NewMessage.Event) -> None:
     """Handle a new message for a specific instance."""
-    stats.increment(inst.name)
     message = event.message
+    if message.raw_text and word_in_text(inst.ignore_words, message.raw_text):
+        logger.debug(
+            "Ignoring message %s for %s due to ignore_words",
+            message.id,
+            inst.name,
+        )
+        return
+    stats.increment(inst.name)
     chat_name = await get_chat_name(event.chat_id, safe=True)
     forward = False
     used_word: str | None = None
