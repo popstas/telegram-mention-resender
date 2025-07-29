@@ -1,7 +1,7 @@
 import asyncio
+import json
 import logging
 from types import SimpleNamespace
-import json
 
 import pytest
 
@@ -110,3 +110,44 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_pa
     inst = data["instances"][0]
     assert inst["name"] == "i"
     assert inst["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
+    sent = []
+
+    class DummyClient:
+        async def send_message(self, *a, **k):
+            sent.append((a, k))
+
+    main.client = DummyClient()
+    main.stats = main.StatsTracker(str(tmp_path / "stats.json"), flush_interval=0)
+
+    inst = main.Instance(
+        name="p",
+        words=[],
+        prompts=["hi"],
+        prompt_threshold=4,
+        target_chat=1,
+    )
+
+    async def fake_match(prompts, text, threshold):
+        assert threshold == 4
+        return 5
+
+    async def fake_get_message_source(msg):
+        return "src"
+
+    async def fake_get_chat_name(v, safe=False):
+        return "n"
+
+    monkeypatch.setattr(main, "match_prompts", fake_match)
+    monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
+    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
+
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=7, text="hi")
+    event = SimpleNamespace(message=msg, chat_id=1)
+    await main.process_message(inst, event)
+
+    assert sent[0][0][0] == 1
+    assert msg.forwarded == [1]

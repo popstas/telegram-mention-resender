@@ -75,6 +75,8 @@ def test_load_instances_direct():
                 "chat_ids": [1],
                 "entities": ["e"],
                 "words": ["w"],
+                "prompts": ["p"],
+                "prompt_threshold": 3,
                 "target_chat": 2,
                 "target_entity": "@test",
             }
@@ -88,6 +90,8 @@ def test_load_instances_direct():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
+    assert inst.prompts == ["p"]
+    assert inst.prompt_threshold == 3
     assert inst.target_chat == 2
     assert inst.target_entity == "@test"
 
@@ -107,6 +111,8 @@ def test_load_instances_backward_compat():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
+    assert inst.prompts == []
+    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity is None
 
@@ -123,3 +129,67 @@ def test_load_instances_folder_mute():
     }
     instances = asyncio.run(main.load_instances(config))
     assert instances[0].folder_mute is True
+
+
+@pytest.mark.asyncio
+async def test_match_prompts_iter(monkeypatch):
+    calls = []
+
+    class DummyCompletions:
+        def parse(self, *, model, messages, response_model):  # noqa: D401 - test stub
+            prompt = messages[0]["content"]
+            calls.append(prompt)
+            score = {"p1": 3, "p2": 5}[prompt]
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            parsed=SimpleNamespace(similarity=score)
+                        )
+                    )
+                ]
+            )
+
+    class DummyClient:
+        def __init__(self, api_key=None):  # noqa: D401 - test stub
+            self.chat = SimpleNamespace(completions=DummyCompletions())
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", DummyClient)
+    main.config["openai_api_key"] = "k"
+    result = await main.match_prompts(["p1", "p2"], "msg", 4)
+    assert result == 5
+    assert calls == ["p1", "p2"]
+
+
+@pytest.mark.asyncio
+async def test_match_prompts_iter_stop(monkeypatch):
+    calls = []
+
+    class DummyCompletions:
+        def parse(self, *, model, messages, response_model):  # noqa: D401 - test stub
+            prompt = messages[0]["content"]
+            calls.append(prompt)
+            score = {"p1": 5, "p2": 0}[prompt]
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            parsed=SimpleNamespace(similarity=score)
+                        )
+                    )
+                ]
+            )
+
+    class DummyClient:
+        def __init__(self, api_key=None):  # noqa: D401 - test stub
+            self.chat = SimpleNamespace(completions=DummyCompletions())
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", DummyClient)
+    main.config["openai_api_key"] = "k"
+    result = await main.match_prompts(["p1", "p2"], "msg", 4)
+    assert result == 5
+    assert calls == ["p1"]
