@@ -9,12 +9,19 @@
 
 # Repository Overview
 
-This project forwards Telegram messages that match specific rules to a target chat. The application is implemented in **src/main.py** and uses [Telethon](https://github.com/LonamiWebs/Telethon). Configuration is stored in YAML under `data/config.yml` (see `config-example.yml` for reference).
+This project forwards Telegram messages that match specific rules to a target chat. The runtime logic lives in **src/app.py** while helper modules like `config`, `prompts`, `stats` and `telegram_utils` sit alongside it. The `src/main.py` module simply invokes `app.main()`. Configuration is stored in YAML under `data/config.yml` (see `config-example.yml` for reference).
 
 ```
-├── src/        # application code
-├── tests/      # pytest suite
-├── README.md   # setup instructions
+├── src/
+│   ├── app.py            # runtime logic
+│   ├── main.py           # CLI entry point
+│   ├── config.py         # config helpers
+│   ├── prompts.py        # OpenAI prompts
+│   ├── stats.py          # stats tracking
+│   ├── telegram_utils.py # Telegram helpers
+│   └── __init__.py       # marks package
+├── tests/                # pytest suite
+├── README.md             # setup instructions
 ├── pyproject.toml / requirements.txt  # dependencies
 └── Dockerfile
 ```
