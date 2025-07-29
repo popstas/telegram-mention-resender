@@ -126,12 +126,13 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
     inst = main.Instance(
         name="p",
         words=[],
-        prompts=["hi"],
+        prompts=[main.Prompt(name="hi", prompt="hi", threshold=4)],
         prompt_threshold=4,
         target_chat=1,
     )
 
     async def fake_match(prompts, text, threshold, inst_name):
+        assert prompts == ["hi"]
         assert threshold == 4
         assert inst_name == "p"
         return 5

@@ -75,8 +75,9 @@ def test_load_instances_direct():
                 "chat_ids": [1],
                 "entities": ["e"],
                 "words": ["w"],
-                "prompts": ["p"],
-                "prompt_threshold": 3,
+                "prompts": [
+                    {"name": "p", "prompt": "p", "threshold": 3}
+                ],
                 "target_chat": 2,
                 "target_entity": "@test",
             }
@@ -90,8 +91,12 @@ def test_load_instances_direct():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
-    assert inst.prompts == ["p"]
-    assert inst.prompt_threshold == 3
+    assert len(inst.prompts) == 1
+    p = inst.prompts[0]
+    assert p.name == "p"
+    assert p.prompt == "p"
+    assert p.threshold == 3
+    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity == "@test"
 
@@ -189,3 +194,27 @@ async def test_match_prompts_iter_stop(monkeypatch):
     result = await main.match_prompts(["p1", "p2"], "msg", 4, "i")
     assert result == 5
     assert calls == ["p1"]
+
+
+def test_get_forward_reason_text_word():
+    assert main.get_forward_reason_text(word="hi") == "word: hi"
+
+
+def test_get_forward_reason_text_prompt():
+    p = main.Prompt(name="n", prompt="p", threshold=4)
+    assert main.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
+
+
+@pytest.mark.asyncio
+async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
+    peer = main.types.PeerChannel(1)
+    msg = dummy_message_cls(peer)
+
+    async def fake_get_message_source(m):
+        return "src"
+
+    monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
+    text = await main.get_forward_message_text(
+        msg, prompt=main.Prompt(name="n", prompt="p"), score=4
+    )
+    assert text == "n: 4/5\nsrc"
