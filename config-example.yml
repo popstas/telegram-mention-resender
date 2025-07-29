@@ -4,6 +4,7 @@ session: data/session
 log_level: info
 openai_api_key: ""
 openai_model: gpt-4.1-mini
+ignore_usernames: []
 instances:
   - name: default
     entities:

@@ -295,7 +295,11 @@ def get_forward_reason_text(
 
 
 async def get_forward_message_text(
-    message, *, prompt: Prompt | None = None, score: int | None = None, word: str | None = None
+    message,
+    *,
+    prompt: Prompt | None = None,
+    score: int | None = None,
+    word: str | None = None,
 ) -> str:
     """Return text to send before forwarding ``message``."""
     reason = get_forward_reason_text(prompt=prompt, score=score, word=word)
@@ -661,6 +665,13 @@ async def main() -> None:
 
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
+        username = getattr(getattr(event.message, "sender", None), "username", None)
+        if username and username.lower() in [
+            u.lower() for u in config.get("ignore_usernames", [])
+        ]:
+            logger.debug("Ignoring message from @%s", username)
+            return
+
         for inst in instances:
             if event.chat_id in inst.chat_ids:
                 await process_message(inst, event)
