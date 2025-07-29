@@ -11,6 +11,7 @@ from typing import List, Set
 
 import yaml
 from openai import OpenAI
+import httpx
 from pydantic import BaseModel
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id, resolve_id
@@ -69,19 +70,21 @@ class StatsTracker:
         self.flush_interval = flush_interval
         self.last_flush = time.monotonic()
         self.dirty = False
-        self.data = {"total": 0, "instances": []}
+        self.data = {"total": 0, "tokens": 0, "instances": []}
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     self.data = json.load(f)
             except Exception:  # pragma: no cover - corrupt file
-                self.data = {"total": 0, "instances": []}
+                self.data = {"total": 0, "tokens": 0, "instances": []}
+        self.data.setdefault("tokens", 0)
 
     def _get_inst(self, name: str) -> dict:
         for inst in self.data.get("instances", []):
             if inst.get("name") == name:
+                inst.setdefault("tokens", 0)
                 return inst
-        inst = {"name": name, "total": 0, "days": {}}
+        inst = {"name": name, "total": 0, "tokens": 0, "days": {}}
         self.data.setdefault("instances", []).append(inst)
         return inst
 
@@ -91,6 +94,16 @@ class StatsTracker:
         inst["total"] = inst.get("total", 0) + 1
         day = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
         inst["days"][day] = inst["days"].get(day, 0) + 1
+        self.dirty = True
+        if time.monotonic() - self.last_flush >= self.flush_interval:
+            self.flush()
+
+    def add_tokens(self, name: str, tokens: int) -> None:
+        if tokens <= 0:
+            return
+        inst = self._get_inst(name)
+        self.data["tokens"] = self.data.get("tokens", 0) + tokens
+        inst["tokens"] = inst.get("tokens", 0) + tokens
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()
@@ -136,7 +149,9 @@ def word_in_text(words: List[str], text: str) -> bool:
     return any(word.lower() in text_lower for word in words)
 
 
-async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
+async def match_prompts(
+    prompts: List[str], text: str, threshold: int, inst_name: str | None = None
+) -> int:
     """Return similarity score from 0 to 5 for ``text`` using OpenAI."""
     if not prompts or not config.get("openai_api_key"):
         return 0
@@ -144,7 +159,9 @@ async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
     class EvaluateResult(BaseModel):
         similarity: int
 
-    client = OpenAI(api_key=config["openai_api_key"])
+    proxy = config.get("proxy_url")
+    http_client = httpx.Client(proxies=proxy) if proxy else None
+    client = OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
     best = 0
@@ -167,10 +184,12 @@ async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
                 response_format=EvaluateResult,
             )
             similarity = completion.choices[0].message.parsed.similarity
+            tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
+            if inst_name:
+                stats.add_tokens(inst_name, tokens)
         except Exception as exc:  # pragma: no cover - external call
             logger.error("Failed to query OpenAI: %s", exc)
             similarity = 0
-        logger.debug("Prompt check: %s -> %s", prompt, similarity)
         best = max(best, similarity)
         if similarity >= threshold:
             return similarity
@@ -526,9 +545,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             forward = True
         elif inst.prompts:
             score = await match_prompts(
-                inst.prompts, message.raw_text, inst.prompt_threshold
+                inst.prompts, message.raw_text, inst.prompt_threshold, inst.name
             )
-            logger.debug("Prompt score %s for %s", score, inst.name)
             if score >= inst.prompt_threshold:
                 forward = True
     if forward:
