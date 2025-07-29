@@ -8,7 +8,8 @@
             "name": "main",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/main.py",
+            "program": "-m",
+            "args": ["src.main"],
             "console": "integratedTerminal"
         }
     ]
