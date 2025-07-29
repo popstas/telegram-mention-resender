@@ -15,6 +15,5 @@ instances:
       - name: example
         prompt: Сообщение содержит недовольство.
         threshold: 4
-    prompt_threshold: 4
     target_chat: 0
     target_entity: ""

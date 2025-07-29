@@ -127,13 +127,11 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
         name="p",
         words=[],
         prompts=[main.Prompt(name="hi", prompt="hi", threshold=4)],
-        prompt_threshold=4,
         target_chat=1,
     )
 
-    async def fake_match(prompts, text, threshold, inst_name):
-        assert prompts == ["hi"]
-        assert threshold == 4
+    async def fake_match(prompt, text, inst_name):
+        assert prompt.prompt == "hi"
         assert inst_name == "p"
         return 5
 
@@ -143,7 +141,7 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
     async def fake_get_chat_name(v, safe=False):
         return "n"
 
-    monkeypatch.setattr(main, "match_prompts", fake_match)
+    monkeypatch.setattr(main, "match_prompt", fake_match)
     monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
     monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
 

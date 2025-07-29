@@ -47,7 +47,7 @@ class Prompt:
 
     name: str | None = None
     prompt: str | None = None
-    threshold: int | None = None
+    threshold: int = 4
 
 
 @dataclass
@@ -63,7 +63,6 @@ class Instance:
     chat_ids: Set[int] = field(default_factory=set)
     folder_mute: bool = False
     prompts: List[Prompt] = field(default_factory=list)
-    prompt_threshold: int = 4
 
 
 instances: List[Instance] = []
@@ -170,11 +169,9 @@ def find_word(words: List[str], text: str) -> str | None:
     return None
 
 
-async def match_prompts(
-    prompts: List[str], text: str, threshold: int, inst_name: str | None = None
-) -> int:
+async def match_prompt(prompt: Prompt, text: str, inst_name: str | None = None) -> int:
     """Return similarity score from 0 to 5 for ``text`` using OpenAI."""
-    if not prompts or not config.get("openai_api_key"):
+    if not prompt.prompt or not config.get("openai_api_key"):
         return 0
 
     class EvaluateResult(BaseModel):
@@ -185,38 +182,32 @@ async def match_prompts(
     client = OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
-    best = 0
-    for prompt in prompts:
-        messages = [
-            {
-                "role": "system",
-                "content": f"{prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
-            },
-            {
-                "role": "user",
-                "content": text,
-            },
-        ]
-        try:
-            completion = await asyncio.to_thread(
-                client.chat.completions.parse,
-                model=model,
-                messages=messages,
-                response_format=EvaluateResult,
-            )
-            similarity = completion.choices[0].message.parsed.similarity
-            tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
-            if inst_name:
-                stats.add_tokens(inst_name, tokens)
-        except Exception as exc:  # pragma: no cover - external call
-            logger.error("Failed to query OpenAI: %s", exc)
-            similarity = 0
-        logger.debug("Prompt check: %s -> %s", prompt, similarity)
-        best = max(best, similarity)
-        if similarity >= threshold:
-            return similarity
-
-    return best
+    messages = [
+        {
+            "role": "system",
+            "content": f"{prompt.prompt}\n\nEvaluate message similarity: 0 - not match at all, 5 - strongly match.",
+        },
+        {
+            "role": "user",
+            "content": text,
+        },
+    ]
+    try:
+        completion = await asyncio.to_thread(
+            client.chat.completions.parse,
+            model=model,
+            messages=messages,
+            response_format=EvaluateResult,
+        )
+        similarity = completion.choices[0].message.parsed.similarity
+        tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
+        if inst_name:
+            stats.add_tokens(inst_name, tokens)
+    except Exception as exc:  # pragma: no cover - external call
+        logger.error("Failed to query OpenAI: %s", exc)
+        similarity = 0
+    logger.debug("Prompt check: %s -> %s", prompt.name, similarity)
+    return similarity
 
 
 async def get_folder(folders, folder_name):
@@ -495,7 +486,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     Prompt(
                         name=p.get("name"),
                         prompt=p.get("prompt"),
-                        threshold=p.get("threshold"),
+                        threshold=p.get("threshold", 4),
                     )
                 )
             else:
@@ -511,7 +502,6 @@ async def load_instances(config: dict) -> List[Instance]:
             target_entity=inst_cfg.get("target_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
             prompts=parsed_prompts,
-            prompt_threshold=inst_cfg.get("prompt_threshold", 4),
         )
         parsed_instances.append(instance)
     return parsed_instances
@@ -610,12 +600,11 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             used_word = w
         else:
             for p in inst.prompts:
-                thr = p.threshold or inst.prompt_threshold
-                sc = await match_prompts([p.prompt], message.raw_text, thr, inst.name)
+                sc = await match_prompt(p, message.raw_text, inst.name)
                 if sc > used_score:
                     used_score = sc
                     used_prompt = p
-                if sc >= thr:
+                if sc >= (p.threshold or 4):
                     forward = True
                     break
     if forward:

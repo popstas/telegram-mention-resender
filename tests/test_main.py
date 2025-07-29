@@ -96,7 +96,6 @@ def test_load_instances_direct():
     assert p.name == "p"
     assert p.prompt == "p"
     assert p.threshold == 3
-    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity == "@test"
 
@@ -117,7 +116,6 @@ def test_load_instances_backward_compat():
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
     assert inst.prompts == []
-    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity is None
 
@@ -137,20 +135,17 @@ def test_load_instances_folder_mute():
 
 
 @pytest.mark.asyncio
-async def test_match_prompts_iter(monkeypatch):
+async def test_match_prompt(monkeypatch):
     calls = []
 
     class DummyCompletions:
         def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
             prompt = messages[0]["content"].split("\n", 1)[0]
             calls.append(prompt)
-            score = {"p1": 3, "p2": 5}[prompt]
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(
-                            parsed=SimpleNamespace(similarity=score)
-                        )
+                        message=SimpleNamespace(parsed=SimpleNamespace(similarity=3))
                     )
                 ]
             )
@@ -161,39 +156,18 @@ async def test_match_prompts_iter(monkeypatch):
 
     monkeypatch.setattr(main, "OpenAI", DummyClient)
     main.config["openai_api_key"] = "k"
-    result = await main.match_prompts(["p1", "p2"], "msg", 4, "i")
-    assert result == 5
-    assert calls == ["p1", "p2"]
+    prompt = main.Prompt(name="p1", prompt="p1", threshold=2)
+    result = await main.match_prompt(prompt, "msg", "i")
+    assert result == 3
+    assert calls == ["p1"]
 
 
 @pytest.mark.asyncio
-async def test_match_prompts_iter_stop(monkeypatch):
-    calls = []
-
-    class DummyCompletions:
-        def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
-            prompt = messages[0]["content"].split("\n", 1)[0]
-            calls.append(prompt)
-            score = {"p1": 5, "p2": 0}[prompt]
-            return SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        message=SimpleNamespace(
-                            parsed=SimpleNamespace(similarity=score)
-                        )
-                    )
-                ]
-            )
-
-    class DummyClient:
-        def __init__(self, api_key=None, http_client=None):  # noqa: D401 - test stub
-            self.chat = SimpleNamespace(completions=DummyCompletions())
-
-    monkeypatch.setattr(main, "OpenAI", DummyClient)
-    main.config["openai_api_key"] = "k"
-    result = await main.match_prompts(["p1", "p2"], "msg", 4, "i")
-    assert result == 5
-    assert calls == ["p1"]
+async def test_match_prompt_no_api(monkeypatch):
+    main.config["openai_api_key"] = ""
+    prompt = main.Prompt(name="n", prompt="hello")
+    result = await main.match_prompt(prompt, "msg")
+    assert result == 0
 
 
 def test_get_forward_reason_text_word():
