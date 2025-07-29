@@ -9,12 +9,17 @@ def test_stats_increment_and_flush(tmp_path):
     tracker.increment("a")
     tracker.increment("a")
     tracker.increment("b")
+    tracker.add_tokens("a", 10)
+    tracker.add_tokens("b", 5)
     tracker.flush()
     data = json.loads(path.read_text())
     assert data["total"] == 3
+    assert data["tokens"] == 15
     inst_a = next(i for i in data["instances"] if i["name"] == "a")
     inst_b = next(i for i in data["instances"] if i["name"] == "b")
     assert inst_a["total"] == 2
     assert inst_b["total"] == 1
+    assert inst_a["tokens"] == 10
+    assert inst_b["tokens"] == 5
     day = list(inst_a["days"].keys())[0]
     assert inst_a["days"][day] == 2

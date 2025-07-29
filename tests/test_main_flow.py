@@ -131,8 +131,9 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
         target_chat=1,
     )
 
-    async def fake_match(prompts, text, threshold):
+    async def fake_match(prompts, text, threshold, inst_name):
         assert threshold == 4
+        assert inst_name == "p"
         return 5
 
     async def fake_get_message_source(msg):
