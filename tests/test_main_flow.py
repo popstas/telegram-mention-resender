@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from types import SimpleNamespace
+import json
 
 import pytest
 
@@ -54,13 +55,18 @@ async def test_setup_logging(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
+async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path):
     config = {"log_level": "info"}
     monkeypatch.setattr(main, "load_config", lambda: config)
     monkeypatch.setattr(main, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
     monkeypatch.setattr(main, "TelegramClient", lambda s, a, b: dummy_client)
+
+    stats_path = tmp_path / "stats.json"
+    monkeypatch.setattr(
+        main, "stats", main.StatsTracker(str(stats_path), flush_interval=0)
+    )
 
     async def fake_rescan(inst):
         return None
@@ -99,3 +105,8 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls):
     assert msg.forwarded == [99, "name"]
     assert dummy_client.sent[0][0][0] == 99
     assert dummy_client.sent[1][0][0] == "name"
+    data = json.loads(stats_path.read_text())
+    assert data["total"] == 1
+    inst = data["instances"][0]
+    assert inst["name"] == "i"
+    assert inst["total"] == 1

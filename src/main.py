@@ -2,6 +2,10 @@ import asyncio
 import logging
 import os
 import re
+import json
+import time
+import atexit
+import datetime
 from dataclasses import dataclass, field
 from typing import List, Set
 
@@ -50,6 +54,55 @@ instances: List[Instance] = []
 MUTE_FOREVER = 2**31 - 1
 
 CONFIG_PATH = os.path.join("data", "config.yml")
+STATS_PATH = os.path.join("data", "stats.json")
+
+
+class StatsTracker:
+    """Collect and periodically flush statistics about processed messages."""
+
+    def __init__(self, path: str, flush_interval: int = 60) -> None:
+        self.path = path
+        self.flush_interval = flush_interval
+        self.last_flush = time.monotonic()
+        self.dirty = False
+        self.data = {"total": 0, "instances": []}
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    self.data = json.load(f)
+            except Exception:  # pragma: no cover - corrupt file
+                self.data = {"total": 0, "instances": []}
+
+    def _get_inst(self, name: str) -> dict:
+        for inst in self.data.get("instances", []):
+            if inst.get("name") == name:
+                return inst
+        inst = {"name": name, "total": 0, "days": {}}
+        self.data.setdefault("instances", []).append(inst)
+        return inst
+
+    def increment(self, name: str) -> None:
+        inst = self._get_inst(name)
+        self.data["total"] = self.data.get("total", 0) + 1
+        inst["total"] = inst.get("total", 0) + 1
+        day = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        inst["days"][day] = inst["days"].get(day, 0) + 1
+        self.dirty = True
+        if time.monotonic() - self.last_flush >= self.flush_interval:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.dirty:
+            return
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, ensure_ascii=False, indent=4)
+        self.last_flush = time.monotonic()
+        self.dirty = False
+
+
+stats = StatsTracker(STATS_PATH)
+atexit.register(stats.flush)
 
 
 def load_config() -> dict:
@@ -413,6 +466,45 @@ async def get_entity_name(peer_id, safe: bool = False) -> str:
     return await get_chat_name(peer, safe=safe)
 
 
+async def process_message(inst: Instance, event: events.NewMessage.Event) -> None:
+    """Handle a new message for a specific instance."""
+    stats.increment(inst.name)
+    message = event.message
+    chat_name = await get_chat_name(event.chat_id, safe=True)
+    if message.raw_text and word_in_text(inst.words, message.raw_text):
+        try:
+            source = await get_message_source(message)
+            destinations = []
+            dest_names = []
+            if inst.target_chat is not None:
+                destinations.append(inst.target_chat)
+                dest_names.append(await get_chat_name(inst.target_chat, safe=True))
+            if inst.target_entity:
+                destinations.append(inst.target_entity)
+                dest_names.append(await get_chat_name(inst.target_entity, safe=True))
+            for dest, dname in zip(destinations, dest_names):
+                await client.send_message(dest, source)
+                forwarded = await message.forward_to(dest)
+                f_url = get_message_url(forwarded) if forwarded else None
+                logger.info(
+                    "Forwarded message %s from %s to %s for %s (target url: %s)",
+                    message.id,
+                    chat_name,
+                    dname,
+                    inst.name,
+                    f_url,
+                )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("Failed to forward message: %s", exc)
+    else:
+        logger.debug(
+            "Message %s from %s not forwarded for %s",
+            message.id,
+            chat_name,
+            inst.name,
+        )
+
+
 async def main() -> None:
     global client, instances, config
     config = load_config()
@@ -431,49 +523,9 @@ async def main() -> None:
 
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
-        message = event.message
         for inst in instances:
-            if event.chat_id not in inst.chat_ids:
-                continue
-
-            chat_name = await get_chat_name(event.chat_id, safe=True)
-            if message.raw_text and word_in_text(inst.words, message.raw_text):
-                try:
-                    source = await get_message_source(message)
-                    destinations = []
-                    dest_names = []
-                    if inst.target_chat is not None:
-                        destinations.append(inst.target_chat)
-                        dest_names.append(
-                            await get_chat_name(inst.target_chat, safe=True)
-                        )
-                    if inst.target_entity:
-                        destinations.append(inst.target_entity)
-                        dest_names.append(
-                            await get_chat_name(inst.target_entity, safe=True)
-                        )
-
-                    for dest, dname in zip(destinations, dest_names):
-                        await client.send_message(dest, source)
-                        forwarded = await message.forward_to(dest)
-                        f_url = get_message_url(forwarded) if forwarded else None
-                        logger.info(
-                            "Forwarded message %s from %s to %s for %s (target url: %s)",
-                            message.id,
-                            chat_name,
-                            dname,
-                            inst.name,
-                            f_url,
-                        )
-                except Exception as exc:  # pylint: disable=broad-except
-                    logger.error("Failed to forward message: %s", exc)
-            else:
-                logger.debug(
-                    "Message %s from %s not forwarded for %s",
-                    message.id,
-                    chat_name,
-                    inst.name,
-                )
+            if event.chat_id in inst.chat_ids:
+                await process_message(inst, event)
 
     await client.run_until_disconnected()
 
