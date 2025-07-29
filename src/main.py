@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 import yaml
+from pydantic import BaseModel
 from telethon import TelegramClient, events, functions, types
 from telethon.utils import get_peer_id, resolve_id
 
@@ -47,6 +48,8 @@ class Instance:
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
     folder_mute: bool = False
+    prompts: List[str] = field(default_factory=list)
+    prompt_threshold: int = 4
 
 
 instances: List[Instance] = []
@@ -130,6 +133,50 @@ def word_in_text(words: List[str], text: str) -> bool:
     """Return True if any of the words is found in text."""
     text_lower = text.lower()
     return any(word.lower() in text_lower for word in words)
+
+
+class EvaluateResult(BaseModel):
+    similarity: int
+
+
+async def match_prompts(prompts: List[str], text: str, threshold: int) -> int:
+    """Return similarity for ``text`` using OpenAI and ``prompts``."""
+    if not prompts or not config.get("openai_api_key"):
+        return 0
+
+    import openai
+
+    client = openai.OpenAI(api_key=config["openai_api_key"])
+    model = config.get("openai_model", "gpt-4.1-mini")
+
+    for prompt in prompts:
+        messages = [
+            {"role": "system", "content": prompt},
+            {
+                "role": "user",
+                "content": (
+                    "return only number of similarity: 0 - not match at all, 5 - strongly match. "
+                    f"Message: {text}"
+                ),
+            },
+        ]
+        try:
+            completion = await asyncio.to_thread(
+                client.chat.completions.parse,
+                model=model,
+                messages=messages,
+                response_format=EvaluateResult,
+            )
+            score = completion.choices[0].message.parsed.similarity
+        except Exception as exc:  # pragma: no cover - external call
+            logger.error("Failed to query OpenAI: %s", exc)
+            score = 0
+
+        logger.debug("Prompt '%s' similarity %s", prompt, score)
+        if score >= threshold:
+            return score
+
+    return 0
 
 
 async def get_folder(folders, folder_name):
@@ -386,6 +433,8 @@ async def load_instances(config: dict) -> List[Instance]:
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
+            prompts=inst_cfg.get("prompts", []),
+            prompt_threshold=inst_cfg.get("prompt_threshold", 4),
         )
         parsed_instances.append(instance)
     return parsed_instances
@@ -472,7 +521,18 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
     stats.increment(inst.name)
     message = event.message
     chat_name = await get_chat_name(event.chat_id, safe=True)
-    if message.raw_text and word_in_text(inst.words, message.raw_text):
+    forward = False
+    if message.raw_text:
+        if word_in_text(inst.words, message.raw_text):
+            forward = True
+        elif inst.prompts:
+            score = await match_prompts(
+                inst.prompts, message.raw_text, inst.prompt_threshold
+            )
+            logger.debug("Prompt score %s for %s", score, inst.name)
+            if score >= inst.prompt_threshold:
+                forward = True
+    if forward:
         try:
             source = await get_message_source(message)
             destinations = []

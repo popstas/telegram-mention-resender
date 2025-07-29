@@ -75,6 +75,8 @@ def test_load_instances_direct():
                 "chat_ids": [1],
                 "entities": ["e"],
                 "words": ["w"],
+                "prompts": ["p"],
+                "prompt_threshold": 3,
                 "target_chat": 2,
                 "target_entity": "@test",
             }
@@ -88,6 +90,8 @@ def test_load_instances_direct():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
+    assert inst.prompts == ["p"]
+    assert inst.prompt_threshold == 3
     assert inst.target_chat == 2
     assert inst.target_entity == "@test"
 
@@ -107,6 +111,8 @@ def test_load_instances_backward_compat():
     assert inst.chat_ids == {1}
     assert inst.entities == ["e"]
     assert inst.words == ["w"]
+    assert inst.prompts == []
+    assert inst.prompt_threshold == 4
     assert inst.target_chat == 2
     assert inst.target_entity is None
 

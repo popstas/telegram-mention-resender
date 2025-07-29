@@ -24,6 +24,7 @@ requires-python = ">=3.10"
 dependencies = [
     "telethon",
     "PyYAML",
+    "openai",
 ]
 
 [project.optional-dependencies]
