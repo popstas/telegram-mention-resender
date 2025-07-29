@@ -3,7 +3,20 @@
 [![Coverage Status](https://coveralls.io/repos/github/popstas/telegram-mention-resender/badge.svg?branch=main)](https://coveralls.io/github/popstas/telegram-mention-resender?branch=main)
 
 This project listens to mentions in specified Telegram chats and forwards
-matching messages to a target chat.
+matching messages to a target chat. The main application logic lives in
+`src/app.py` with supporting modules under `src/`. The `src/main.py` module
+provides the command-line entry point.
+
+```
+src/
+├── app.py            - runtime logic
+├── main.py           - CLI entry point
+├── config.py         - config helpers
+├── prompts.py        - prompt utilities
+├── stats.py          - stats tracking
+├── telegram_utils.py - Telegram helpers
+└── __init__.py       - marks package
+```
 
 # Features
 

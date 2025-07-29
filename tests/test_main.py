@@ -3,66 +3,69 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.main as main
+import src.app as app
+import src.config as config_module
+import src.prompts as prompts
+import src.telegram_utils as tgu
 
 
 def test_word_in_text_basic():
     words = ["hello", "world"]
-    assert main.word_in_text(words, "Hello there") is True
-    assert main.word_in_text(words, "no match") is False
+    assert tgu.word_in_text(words, "Hello there") is True
+    assert tgu.word_in_text(words, "no match") is False
 
 
 def test_get_message_url_object_peer(dummy_message_cls):
     peer = SimpleNamespace(channel_id=42)
     msg = dummy_message_cls(peer)
-    assert main.get_message_url(msg) == "https://t.me/c/42/123"
+    assert tgu.get_message_url(msg) == "https://t.me/c/42/123"
 
 
 def test_get_message_url_peerchannel(dummy_message_cls):
-    peer = main.types.PeerChannel(7)
+    peer = tgu.types.PeerChannel(7)
     msg = dummy_message_cls(peer)
-    assert main.get_message_url(msg) == "https://t.me/c/7/123"
+    assert tgu.get_message_url(msg) == "https://t.me/c/7/123"
 
 
 @pytest.mark.asyncio
 async def test_get_message_source_url(monkeypatch, dummy_message_cls):
-    peer = main.types.PeerChannel(8)
+    peer = tgu.types.PeerChannel(8)
     msg = dummy_message_cls(peer)
     msg.chat = SimpleNamespace(username="chan")
 
     async def fake_get_chat_name(v, safe=False):
         return "chan"
 
-    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
-    res = await main.get_message_source(msg)
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    res = await tgu.get_message_source(msg)
     assert res == "Forwarded from: @chan - https://t.me/c/8/123"
 
 
 @pytest.mark.asyncio
 async def test_get_message_source_text(monkeypatch, dummy_message_cls):
-    peer = main.types.PeerChat(9)
+    peer = tgu.types.PeerChat(9)
     msg = dummy_message_cls(peer)
     msg.chat = SimpleNamespace(title="Group")
 
     async def fake_get_chat_name(v, safe=False):
         return "Group"
 
-    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
-    res = await main.get_message_source(msg)
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    res = await tgu.get_message_source(msg)
     assert res == "Forwarded from: Group"
 
 
 @pytest.mark.asyncio
 async def test_get_message_source_private(monkeypatch, dummy_message_cls):
-    peer = main.types.PeerUser(10)
+    peer = tgu.types.PeerUser(10)
     msg = dummy_message_cls(peer)
     msg.sender = SimpleNamespace(username="user")
 
     async def fake_get_chat_name(v, safe=False):
         return "user"
 
-    monkeypatch.setattr(main, "get_chat_name", fake_get_chat_name)
-    res = await main.get_message_source(msg)
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    res = await tgu.get_message_source(msg)
     assert res == "Forwarded from: private @user"
 
 
@@ -81,7 +84,7 @@ def test_load_instances_direct():
             }
         ]
     }
-    instances = asyncio.run(main.load_instances(config))
+    instances = asyncio.run(config_module.load_instances(config))
     assert len(instances) == 1
     inst = instances[0]
     assert inst.name == "test"
@@ -106,7 +109,7 @@ def test_load_instances_backward_compat():
         "words": ["w"],
         "target_chat": 2,
     }
-    instances = asyncio.run(main.load_instances(config))
+    instances = asyncio.run(config_module.load_instances(config))
     assert len(instances) == 1
     inst = instances[0]
     assert inst.folders == ["f"]
@@ -128,19 +131,19 @@ def test_load_instances_folder_mute():
             }
         ]
     }
-    instances = asyncio.run(main.load_instances(config))
+    instances = asyncio.run(config_module.load_instances(config))
     assert instances[0].folder_mute is True
 
 
 def test_load_instances_ignore_words():
     config = {"instances": [{"name": "i", "words": [], "ignore_words": ["bad"]}]}
-    instances = asyncio.run(main.load_instances(config))
+    instances = asyncio.run(config_module.load_instances(config))
     assert instances[0].ignore_words == ["bad"]
 
 
 def test_load_instances_ignore_words_backward():
     config = {"words": [], "ignore_words": ["bad"]}
-    instances = asyncio.run(main.load_instances(config))
+    instances = asyncio.run(config_module.load_instances(config))
     assert instances[0].ignore_words == ["bad"]
 
 
@@ -171,41 +174,41 @@ async def test_match_prompt(monkeypatch):
         def __init__(self, api_key=None, http_client=None):  # noqa: D401 - test stub
             self.chat = SimpleNamespace(completions=DummyCompletions())
 
-    monkeypatch.setattr(main, "OpenAI", DummyClient)
-    main.config["openai_api_key"] = "k"
-    prompt = main.Prompt(name="p1", prompt="p1", threshold=2)
-    result = await main.match_prompt(prompt, "msg", "i")
+    monkeypatch.setattr(prompts, "OpenAI", DummyClient)
+    prompts.config["openai_api_key"] = "k"
+    prompt = prompts.Prompt(name="p1", prompt="p1", threshold=2)
+    result = await prompts.match_prompt(prompt, "msg", "i")
     assert result.similarity == 3
     assert calls == ["p1"]
 
 
 @pytest.mark.asyncio
 async def test_match_prompt_no_api(monkeypatch):
-    main.config["openai_api_key"] = ""
-    prompt = main.Prompt(name="n", prompt="hello")
-    result = await main.match_prompt(prompt, "msg")
-    assert result == main.EvaluateResult(similarity=0, main_fragment="")
+    prompts.config["openai_api_key"] = ""
+    prompt = prompts.Prompt(name="n", prompt="hello")
+    result = await prompts.match_prompt(prompt, "msg")
+    assert result == prompts.EvaluateResult(similarity=0, main_fragment="")
 
 
 def test_get_forward_reason_text_word():
-    assert main.get_forward_reason_text(word="hi") == "word: hi"
+    assert tgu.get_forward_reason_text(word="hi") == "word: hi"
 
 
 def test_get_forward_reason_text_prompt():
-    p = main.Prompt(name="n", prompt="p", threshold=4)
-    assert main.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
+    p = prompts.Prompt(name="n", prompt="p", threshold=4)
+    assert tgu.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
 
 
 @pytest.mark.asyncio
 async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
-    peer = main.types.PeerChannel(1)
+    peer = tgu.types.PeerChannel(1)
     msg = dummy_message_cls(peer)
 
     async def fake_get_message_source(m):
         return "src"
 
-    monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
-    text = await main.get_forward_message_text(
-        msg, prompt=main.Prompt(name="n", prompt="p"), score=4
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+    text = await tgu.get_forward_message_text(
+        msg, prompt=prompts.Prompt(name="n", prompt="p"), score=4
     )
     assert text == "n: 4/5\nsrc"

@@ -3,15 +3,16 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.main as main
+import src.app as app
+import src.telegram_utils as tgu
 
 
 @pytest.mark.asyncio
 async def test_list_folders_connect(monkeypatch, create_filter, dummy_client_for_list):
     f = create_filter()
     client = dummy_client_for_list([f])
-    monkeypatch.setattr(main, "client", client)
-    result = await main.list_folders()
+    monkeypatch.setattr(tgu, "client", client)
+    result = await tgu.list_folders()
     assert client.connected is True
     assert client.calls == ["connect", "request"]
     assert result == [f]
@@ -20,14 +21,14 @@ async def test_list_folders_connect(monkeypatch, create_filter, dummy_client_for
 @pytest.mark.asyncio
 async def test_get_folder_with_title_text(dummy_folder_cls):
     folders = [dummy_folder_cls(SimpleNamespace(text="MyFolder"))]
-    folder = await main.get_folder(folders, "MyFolder")
+    folder = await tgu.get_folder(folders, "MyFolder")
     assert folder is folders[0]
 
 
 @pytest.mark.asyncio
 async def test_get_folder_not_found(dummy_folder_cls):
     folders = [dummy_folder_cls("Other")]
-    result = await main.get_folder(folders, "Missing")
+    result = await tgu.get_folder(folders, "Missing")
     assert result is None
 
 
@@ -38,14 +39,14 @@ async def test_get_folders_chat_ids(monkeypatch, dummy_folder_peers_cls):
     async def fake_list_folders():
         return folders
 
-    monkeypatch.setattr(main, "list_folders", fake_list_folders)
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
 
     from telethon import types
 
-    chat_ids = await main.get_folders_chat_ids(["F1"])
+    chat_ids = await tgu.get_folders_chat_ids(["F1"])
     expected = {
-        main.get_peer_id(types.PeerChannel(1)),
-        main.get_peer_id(types.PeerChannel(2)),
+        tgu.get_peer_id(types.PeerChannel(1)),
+        tgu.get_peer_id(types.PeerChannel(2)),
     }
     assert chat_ids == expected
 
@@ -67,15 +68,15 @@ async def test_update_instance_chat_ids(monkeypatch):
 
     client = SimpleNamespace(get_input_entity=fake_get_input_entity)
 
-    monkeypatch.setattr(main, "client", client)
-    monkeypatch.setattr(main, "get_folders_chat_ids", fake_get_folders_chat_ids)
-    monkeypatch.setattr(main, "resolve_entities", fake_resolve_entities)
+    monkeypatch.setattr(tgu, "client", client)
+    monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
+    monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
 
-    inst = main.Instance(
+    inst = app.Instance(
         name="i", words=[], target_chat=0, folders=["f"], chat_ids={4}, entities=["e"]
     )
 
-    await main.update_instance_chat_ids(inst, True)
+    await app.update_instance_chat_ids(inst, True)
     assert inst.chat_ids == {-4, -5, -6}
 
 
@@ -92,15 +93,15 @@ async def test_update_instance_chat_ids_mute(monkeypatch):
     async def fake_mute(names):
         called.append(names)
 
-    monkeypatch.setattr(main, "client", SimpleNamespace())
-    monkeypatch.setattr(main, "get_folders_chat_ids", fake_get_folders_chat_ids)
-    monkeypatch.setattr(main, "resolve_entities", fake_resolve_entities)
-    monkeypatch.setattr(main, "mute_chats_from_folders", fake_mute)
+    monkeypatch.setattr(tgu, "client", SimpleNamespace())
+    monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
+    monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
+    monkeypatch.setattr(app, "mute_chats_from_folders", fake_mute)
 
-    inst = main.Instance(
+    inst = app.Instance(
         name="i", words=[], target_chat=0, folders=["f"], folder_mute=True
     )
-    await main.update_instance_chat_ids(inst, True)
+    await app.update_instance_chat_ids(inst, True)
     assert called == [["f"]]
 
 
@@ -114,10 +115,10 @@ async def test_get_folders_chat_ids_channel(monkeypatch):
     async def fake_list_folders():
         return [folder]
 
-    monkeypatch.setattr(main, "list_folders", fake_list_folders)
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
 
-    chat_ids = await main.get_folders_chat_ids(["F1"])
-    expected = {main.get_peer_id(types.PeerChannel(1))}
+    chat_ids = await tgu.get_folders_chat_ids(["F1"])
+    expected = {tgu.get_peer_id(types.PeerChannel(1))}
     assert chat_ids == expected
 
 
@@ -132,11 +133,11 @@ async def test_get_folders_chat_ids_chat_and_user(monkeypatch):
     async def fake_list_folders():
         return [folder]
 
-    monkeypatch.setattr(main, "list_folders", fake_list_folders)
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
 
-    chat_ids = await main.get_folders_chat_ids(["F2"])
+    chat_ids = await tgu.get_folders_chat_ids(["F2"])
     expected = {
-        main.get_peer_id(types.PeerChat(7)),
-        main.get_peer_id(types.PeerUser(8)),
+        tgu.get_peer_id(types.PeerChat(7)),
+        tgu.get_peer_id(types.PeerUser(8)),
     }
     assert chat_ids == expected

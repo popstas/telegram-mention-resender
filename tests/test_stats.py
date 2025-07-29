@@ -1,11 +1,11 @@
 import json
 
-import src.main as main
+import src.stats as stats_module
 
 
 def test_stats_increment_and_flush(tmp_path):
     path = tmp_path / "stats.json"
-    tracker = main.StatsTracker(str(path), flush_interval=0)
+    tracker = stats_module.StatsTracker(str(path), flush_interval=0)
     tracker.increment("a")
     tracker.increment("a")
     tracker.increment("b")
