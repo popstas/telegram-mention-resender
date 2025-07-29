@@ -26,6 +26,7 @@ pip install -r requirements.txt
 - `api_hash` – your Telegram API hash.
 - `session` – path to your session file (default is `data/session`).
 - `log_level` – logging level (default is `info`).
+- `ignore_usernames` – list of usernames to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `target_chat`,
   `target_entity` and `folder_mute`.

@@ -139,24 +139,13 @@ async def test_match_prompt(monkeypatch):
     calls = []
 
     class DummyCompletions:
-        def parse(
-            self,
-            *,
-            model=None,
-            messages=None,
-            response_format=None,
-            response_model=None,
-        ):
+        def parse(self, *, model=None, messages=None, response_format=None, response_model=None):  # noqa: D401 - test stub
             prompt = messages[0]["content"].split("\n", 1)[0]
             calls.append(prompt)
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(
-                            parsed=main.EvaluateResult(
-                                similarity=3, main_fragment="frag"
-                            )
-                        )
+                        message=SimpleNamespace(parsed=SimpleNamespace(similarity=3))
                     )
                 ]
             )
@@ -169,9 +158,7 @@ async def test_match_prompt(monkeypatch):
     main.config["openai_api_key"] = "k"
     prompt = main.Prompt(name="p1", prompt="p1", threshold=2)
     result = await main.match_prompt(prompt, "msg", "i")
-    assert isinstance(result, main.EvaluateResult)
-    assert result.similarity == 3
-    assert result.main_fragment == "frag"
+    assert result == 3
     assert calls == ["p1"]
 
 
@@ -180,8 +167,7 @@ async def test_match_prompt_no_api(monkeypatch):
     main.config["openai_api_key"] = ""
     prompt = main.Prompt(name="n", prompt="hello")
     result = await main.match_prompt(prompt, "msg")
-    assert isinstance(result, main.EvaluateResult)
-    assert result.similarity == 0
+    assert result == 0
 
 
 def test_get_forward_reason_text_word():
@@ -191,14 +177,6 @@ def test_get_forward_reason_text_word():
 def test_get_forward_reason_text_prompt():
     p = main.Prompt(name="n", prompt="p", threshold=4)
     assert main.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
-
-
-def test_get_forward_reason_text_fragment():
-    p = main.Prompt(name="n", prompt="p", threshold=4)
-    assert (
-        main.get_forward_reason_text(prompt=p, score=4, fragment="frag")
-        == "n: 4/5 - frag"
-    )
 
 
 @pytest.mark.asyncio
@@ -211,9 +189,6 @@ async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
 
     monkeypatch.setattr(main, "get_message_source", fake_get_message_source)
     text = await main.get_forward_message_text(
-        msg,
-        prompt=main.Prompt(name="n", prompt="p"),
-        score=4,
-        fragment="frag",
+        msg, prompt=main.Prompt(name="n", prompt="p"), score=4
     )
-    assert text == "n: 4/5 - frag\nsrc"
+    assert text == "n: 4/5\nsrc"

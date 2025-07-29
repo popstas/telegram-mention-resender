@@ -192,7 +192,8 @@ async def match_prompt(
         {
             "role": "system",
             "content": (
-                f"{prompt.prompt}\n\n" "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
+                f"{prompt.prompt}\n\n"
+                "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
                 "Cite most similar text fragment."
             ),
         },
@@ -691,6 +692,13 @@ async def main() -> None:
 
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
+        username = getattr(getattr(event.message, "sender", None), "username", None)
+        if username and username.lower() in [
+            u.lower() for u in config.get("ignore_usernames", [])
+        ]:
+            logger.debug("Ignoring message from @%s", username)
+            return
+
         for inst in instances:
             if event.chat_id in inst.chat_ids:
                 await process_message(inst, event)
