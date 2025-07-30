@@ -5,18 +5,31 @@ from dataclasses import dataclass
 import httpx
 
 try:
+    from langfuse import get_client, observe
     from langfuse.openai import openai  # type: ignore
 except Exception:  # pragma: no cover - optional integration
     import openai  # type: ignore
+
+    def observe(*args, **kwargs):  # type: ignore[override]
+        def decorator(func):
+            return func
+
+        return decorator
+
+    def get_client():  # type: ignore[override]
+        return None
+
+
 from pydantic import BaseModel
 
 from .stats import StatsTracker
+
+langfuse = get_client()
 
 logger = logging.getLogger(__name__)
 
 config: dict = {}
 stats: StatsTracker | None = None
-langfuse_client = None
 
 
 @dataclass
@@ -35,6 +48,7 @@ class EvaluateResult(BaseModel):
     main_fragment: str = ""
 
 
+@observe()
 async def match_prompt(
     prompt: Prompt,
     text: str,
@@ -82,14 +96,13 @@ async def match_prompt(
         result = EvaluateResult(similarity=0, main_fragment="")
     logger.debug("Prompt check: %s -> %s", prompt.name, result.similarity)
 
-    if langfuse_client is not None:
+    if langfuse is not None:
         try:
-            langfuse_client.create_event(
-                name=prompt.name or "match_prompt",
+            langfuse.update_current_trace(
                 input={"prompt": prompt.prompt, "text": text},
                 output=result.model_dump(),
             )
         except Exception as exc:  # pragma: no cover - optional external call
-            logger.error("Failed to log Langfuse event: %s", exc)
+            logger.error("Failed to log Langfuse trace: %s", exc)
 
     return result

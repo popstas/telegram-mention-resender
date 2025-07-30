@@ -10,10 +10,10 @@ import src.prompts as prompts
 class DummyLangfuse:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
-        self.events = []
+        self.traces = []
 
-    def create_event(self, **kwargs):
-        self.events.append(kwargs)
+    def update_current_trace(self, **kwargs):
+        self.traces.append(kwargs)
 
 
 def test_init_langfuse(monkeypatch):
@@ -37,7 +37,7 @@ def test_init_langfuse(monkeypatch):
 @pytest.mark.asyncio
 async def test_match_prompt_logs(monkeypatch):
     dummy = DummyLangfuse()
-    prompts.langfuse_client = dummy
+    monkeypatch.setattr(prompts, "langfuse", dummy)
     prompts.config["openai_api_key"] = "k"
 
     result_obj = prompts.EvaluateResult(similarity=4, main_fragment="f")
@@ -61,7 +61,6 @@ async def test_match_prompt_logs(monkeypatch):
     res = await prompts.match_prompt(prompt, "text", "i", "c")
 
     assert res == result_obj
-    assert dummy.events[0]["name"] == "p"
-    assert dummy.events[0]["input"] == {"prompt": "p", "text": "text"}
-    assert dummy.events[0]["output"] == result_obj.model_dump()
+    assert dummy.traces[0]["input"] == {"prompt": "p", "text": "text"}
+    assert dummy.traces[0]["output"] == result_obj.model_dump()
     assert recorded["metadata"] == {"langfuse_tags": ["i", "c"]}
