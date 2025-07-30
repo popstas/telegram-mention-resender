@@ -99,11 +99,16 @@ async def get_message_source(message):
             name = f"@{chat_username}"
 
     if chat_type == "private":
-        result = f"Forwarded from: {chat_type} {name}"
+        base_name = f"{chat_type} {name}"
     else:
-        result = f"Forwarded from: {name}"
-    if url:
-        result += f" - {url}"
+        base_name = name
+
+    if url and chat_type != "private":
+        result = f"Forwarded from: [{base_name}]({url})"
+    else:
+        result = f"Forwarded from: {base_name}"
+        if url:
+            result += f" - {url}"
     return result
 
 
@@ -121,7 +126,7 @@ def get_forward_reason_text(
         name = getattr(prompt, "name", None) or "prompt"
         reason = f"{name}: {score}/5"
         if fragment:
-            reason += f" - {fragment}"
+            reason += f" - `{fragment}`"
         return reason
     return ""
 
@@ -140,7 +145,7 @@ async def get_forward_message_text(
     )
     source = await get_message_source(message)
     if reason:
-        return f"{reason}\n{source}"
+        return f"{reason}\n\n{source}"
     return source
 
 

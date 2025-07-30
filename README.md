@@ -10,6 +10,7 @@ matching messages to a target chat.
 - Listen folders, chats, channels
 - Multiple instances for different chats, words and targets
 - Each instance has target chat
+- Forwarded messages include a link to the original message
 
 ## Setup
 

@@ -38,7 +38,7 @@ async def test_get_message_source_url(monkeypatch, dummy_message_cls):
 
     monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
     res = await tgu.get_message_source(msg)
-    assert res == "Forwarded from: @chan - https://t.me/c/8/123"
+    assert res == "Forwarded from: [@chan](https://t.me/c/8/123)"
 
 
 @pytest.mark.asyncio
@@ -211,4 +211,4 @@ async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
     text = await tgu.get_forward_message_text(
         msg, prompt=prompts.Prompt(name="n", prompt="p"), score=4
     )
-    assert text == "n: 4/5\nsrc"
+    assert text == "n: 4/5\n\nsrc"
