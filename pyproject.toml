@@ -25,6 +25,7 @@ dependencies = [
     "telethon",
     "PyYAML",
     "openai",
+    "langfuse",
 ]
 
 [project.optional-dependencies]

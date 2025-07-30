@@ -7,3 +7,4 @@ pytest-asyncio
 pytest-cov
 coverage
 openai
+langfuse

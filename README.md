@@ -27,6 +27,9 @@ pip install -r requirements.txt
 - `api_hash` – your Telegram API hash.
 - `session` – path to your session file (default is `data/session`).
 - `log_level` – logging level (default is `info`).
+- `langfuse_public_key` – (optional) public key to enable Langfuse tracing.
+- `langfuse_secret_key` – (optional) secret key for Langfuse.
+- `langfuse_base_url` – (optional) custom Langfuse API URL.
 - `ignore_usernames` – list of usernames to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `ignore_words`, `target_chat`,
@@ -40,6 +43,15 @@ python -m src.main
 
 The application will listen to new messages in all configured instances and
 forward those containing any of the specified words to their target chats.
+
+### Langfuse tracing
+
+Set `langfuse_public_key` and `langfuse_secret_key` in the config to enable
+tracing with [Langfuse](https://langfuse.com). Optionally specify
+`langfuse_base_url` if using a self-hosted instance.
+The bot uses the Langfuse OpenAI integration, so all OpenAI calls are
+automatically traced. Each request is tagged with the instance name and chat
+name to make debugging easier.
 
 ## Development
 
