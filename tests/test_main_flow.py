@@ -213,6 +213,51 @@ async def test_ignore_usernames(
 
 
 @pytest.mark.asyncio
+async def test_false_positive_reaction(monkeypatch, dummy_message_cls):
+    sent = []
+
+    class DummyClient:
+        async def send_message(self, *args, **kwargs):
+            sent.append((args, kwargs))
+
+        async def get_messages(self, peer, ids):
+            return msg
+
+    app.client = DummyClient()
+    inst = app.Instance(
+        name="i",
+        words=[],
+        target_entity="t",
+        false_positive_entity="fp",
+    )
+    app.instances = [inst]
+
+    msg = dummy_message_cls(SimpleNamespace(channel_id=77), msg_id=5, text="hi")
+
+    update = tgu.types.UpdateMessageReactions(
+        peer=tgu.types.PeerChannel(77),
+        msg_id=5,
+        reactions=tgu.types.MessageReactions(
+            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001F44E"), 1)]
+        ),
+    )
+
+    async def fake_to_event_chat_id(peer):
+        return 77
+
+    async def fake_get_forward_message_text(m, **kwargs):
+        return "src"
+
+    monkeypatch.setattr(tgu, "to_event_chat_id", fake_to_event_chat_id)
+    monkeypatch.setattr(tgu, "get_forward_message_text", fake_get_forward_message_text)
+
+    await app.handle_reaction(update)
+
+    assert sent[0][0][0] == "fp"
+    assert msg.forwarded == ["fp"]
+
+
+@pytest.mark.asyncio
 async def test_ignore_words(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path):
     config = {"log_level": "info"}
     monkeypatch.setattr(app, "load_config", lambda: config)

@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import List
 
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, types
 
 from . import prompts, telegram_utils
 from .config import Instance, get_api_credentials, load_config, load_instances
@@ -28,6 +28,8 @@ instances: List[Instance] = []
 
 # Use shared stats tracker
 stats = global_stats
+
+NEGATIVE_REACTIONS = {"\U0001F44E"}  # thumbs down
 
 
 def setup_logging(level: str = "info") -> None:
@@ -143,6 +145,47 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
         )
 
 
+async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
+    """Forward negatively reacted messages to false_positive_entity."""
+
+    if not update or not hasattr(update, "reactions"):
+        return
+
+    emojis: list[str] = []
+    for rc in getattr(update.reactions, "results", []):
+        reaction = getattr(rc, "reaction", None)
+        if isinstance(reaction, types.ReactionEmoji):
+            emojis.append(reaction.emoticon)
+
+    if not any(e in NEGATIVE_REACTIONS for e in emojis):
+        return
+
+    peer_id = await telegram_utils.to_event_chat_id(update.peer)
+    for inst in instances:
+        if not inst.false_positive_entity or not inst.target_entity:
+            continue
+        target_id = await telegram_utils.to_event_chat_id(inst.target_entity)
+        if peer_id != target_id:
+            continue
+
+        message = await client.get_messages(update.peer, ids=update.msg_id)
+        if not message:
+            return
+        text = await get_forward_message_text(message)
+        await client.send_message(inst.false_positive_entity, text)
+        forwarded = await message.forward_to(inst.false_positive_entity)
+        f_url = get_message_url(forwarded) if forwarded else None
+        logger.info(
+            "Forwarded message %s from %s to %s for %s (target url: %s)",
+            message.id,
+            inst.target_entity,
+            inst.false_positive_entity,
+            inst.name,
+            f_url,
+        )
+        break
+
+
 async def main() -> None:
     global client, instances, config
     config = load_config()
@@ -162,6 +205,10 @@ async def main() -> None:
     for inst in instances:
         await update_instance_chat_ids(inst, True)
         asyncio.create_task(rescan_loop(inst))
+
+    @client.on(events.Raw(types.UpdateMessageReactions))
+    async def reaction_event_handler(update) -> None:
+        await handle_reaction(update)
 
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:

@@ -19,3 +19,4 @@ instances:
         threshold: 4
     target_chat: 0
     target_entity: ""
+    false_positive_entity: ""
