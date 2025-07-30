@@ -137,9 +137,10 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
         target_chat=1,
     )
 
-    async def fake_match(prompt, text, inst_name):
+    async def fake_match(prompt, text, inst_name, chat_name):
         assert prompt.prompt == "hi"
         assert inst_name == "p"
+        assert chat_name == "n"
         return prompts.EvaluateResult(similarity=5, main_fragment="")
 
     async def fake_get_message_source(msg):
@@ -151,6 +152,7 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
     monkeypatch.setattr(app, "match_prompt", fake_match)
     monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
     monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    monkeypatch.setattr(app, "get_chat_name", fake_get_chat_name)
 
     msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=7, text="hi")
     event = SimpleNamespace(message=msg, chat_id=1)

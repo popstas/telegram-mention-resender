@@ -4,6 +4,9 @@ session: data/session
 log_level: info
 openai_api_key: ""
 openai_model: gpt-4.1-mini
+langfuse_public_key: ""
+langfuse_secret_key: ""
+langfuse_base_url: ""
 ignore_usernames: []
 instances:
   - name: default

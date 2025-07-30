@@ -4,7 +4,7 @@ from typing import List
 
 from telethon import TelegramClient, events, types
 
-from . import prompts, telegram_utils
+from . import langfuse_utils, prompts, telegram_utils
 from .config import Instance, get_api_credentials, load_config, load_instances
 from .prompts import Prompt, match_prompt
 from .stats import stats as global_stats
@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 client: TelegramClient | None = None
 config: dict = {}
 instances: List[Instance] = []
+
+langfuse = None
 
 # Use shared stats tracker
 stats = global_stats
@@ -97,7 +99,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             used_word = w
         else:
             for p in inst.prompts:
-                res = await match_prompt(p, message.raw_text, inst.name)
+                res = await match_prompt(p, message.raw_text, inst.name, chat_name)
                 sc = res.similarity
                 if sc > used_score:
                     used_score = sc
@@ -200,6 +202,9 @@ async def main() -> None:
     global client, instances, config
     config = load_config()
     prompts.config.update(config)
+    global langfuse
+    langfuse = langfuse_utils.init_langfuse(config)
+    prompts.langfuse = langfuse
 
     setup_logging(config.get("log_level", "info"))
 

@@ -3,10 +3,25 @@ import logging
 from dataclasses import dataclass
 
 import httpx
-from openai import OpenAI
+
+try:
+    from langfuse import observe  # type: ignore
+    from langfuse.openai import openai  # type: ignore
+except Exception:  # pragma: no cover - optional integration
+    import openai  # type: ignore
+
+    def observe(*args, **kwargs):  # type: ignore[override]
+        def decorator(func):
+            return func
+
+        return decorator
+
+
 from pydantic import BaseModel
 
 from .stats import StatsTracker
+
+langfuse = None
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +45,12 @@ class EvaluateResult(BaseModel):
     main_fragment: str = ""
 
 
+@observe()
 async def match_prompt(
-    prompt: Prompt, text: str, inst_name: str | None = None
+    prompt: Prompt,
+    text: str,
+    inst_name: str | None = None,
+    chat_name: str | None = None,
 ) -> EvaluateResult:
     """Return :class:`EvaluateResult` for ``text`` using OpenAI."""
     if not prompt.prompt or not config.get("openai_api_key"):
@@ -39,7 +58,7 @@ async def match_prompt(
 
     proxy = config.get("proxy_url")
     http_client = httpx.Client(proxy=proxy) if proxy else None
-    client = OpenAI(api_key=config["openai_api_key"], http_client=http_client)
+    client = openai.OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
     messages = [
@@ -54,11 +73,16 @@ async def match_prompt(
         {"role": "user", "content": text},
     ]
     try:
+        metadata = {}
+        tags = [t for t in [inst_name, chat_name] if t]
+        if tags:
+            metadata["langfuse_tags"] = tags
         completion = await asyncio.to_thread(
             client.chat.completions.parse,
             model=model,
             messages=messages,
             response_format=EvaluateResult,
+            metadata=metadata or None,
         )
         result = completion.choices[0].message.parsed
         tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
@@ -68,4 +92,15 @@ async def match_prompt(
         logger.error("Failed to query OpenAI: %s", exc)
         result = EvaluateResult(similarity=0, main_fragment="")
     logger.debug("Prompt check: %s -> %s", prompt.name, result.similarity)
+
+    if langfuse is not None:
+        try:
+            langfuse.update_current_trace(
+                name=prompt.name,
+                input=text,
+                output=result.model_dump(),
+            )
+        except Exception as exc:  # pragma: no cover - optional external call
+            logger.error("Failed to log Langfuse trace: %s", exc)
+
     return result

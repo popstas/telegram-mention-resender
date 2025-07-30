@@ -159,6 +159,7 @@ async def test_match_prompt(monkeypatch):
             messages=None,
             response_format=None,
             response_model=None,
+            metadata=None,
         ):  # noqa: D401 - test stub
             prompt = messages[0]["content"].split("\n", 1)[0]
             calls.append(prompt)
@@ -174,10 +175,10 @@ async def test_match_prompt(monkeypatch):
         def __init__(self, api_key=None, http_client=None):  # noqa: D401 - test stub
             self.chat = SimpleNamespace(completions=DummyCompletions())
 
-    monkeypatch.setattr(prompts, "OpenAI", DummyClient)
+    monkeypatch.setattr(prompts.openai, "OpenAI", DummyClient)
     prompts.config["openai_api_key"] = "k"
     prompt = prompts.Prompt(name="p1", prompt="p1", threshold=2)
-    result = await prompts.match_prompt(prompt, "msg", "i")
+    result = await prompts.match_prompt(prompt, "msg", "i", "c")
     assert result.similarity == 3
     assert calls == ["p1"]
 
