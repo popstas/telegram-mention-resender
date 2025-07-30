@@ -126,7 +126,7 @@ def get_forward_reason_text(
         name = getattr(prompt, "name", None) or "prompt"
         reason = f"{name}: {score}/5"
         if fragment:
-            reason += f" - {fragment}"
+            reason += f" - `{fragment}`"
         return reason
     return ""
 
