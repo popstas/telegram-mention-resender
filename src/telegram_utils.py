@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 client = None
 entity_name_cache: dict = {}
+entity_cache: dict = {}
 
 MUTE_FOREVER = 2**31 - 1
 
@@ -33,6 +34,16 @@ def find_word(words: List[str], text: str) -> str | None:
         if word.lower() in text_lower:
             return word
     return None
+
+
+async def get_entity(ident):
+    """Return Telegram entity using in-memory cache."""
+    key = str(ident)
+    if key in entity_cache:
+        return entity_cache[key]
+    ent = await client.get_entity(ident)
+    entity_cache[key] = ent
+    return ent
 
 
 async def get_folder(folders, folder_name):
@@ -161,7 +172,7 @@ async def get_chat_name(chat_identifier: str, safe: bool = False) -> str:
         return entity_name_cache[chat_identifier]
 
     try:
-        entity = await client.get_entity(chat_identifier)
+        entity = await get_entity(chat_identifier)
         if not entity:
             return None
 
@@ -284,7 +295,7 @@ async def resolve_entities(entities: List[str]) -> Set[int]:
     resolved = set()
     for ent in entities:
         try:
-            entity = await client.get_entity(ent)
+            entity = await get_entity(ent)
             resolved.add(get_peer_id(entity))
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("Failed to resolve entity %s: %s", ent, exc)

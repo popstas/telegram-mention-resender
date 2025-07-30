@@ -30,6 +30,7 @@ instances: List[Instance] = []
 stats = global_stats
 
 NEGATIVE_REACTIONS = {"👎"}  # thumbs down
+POSITIVE_REACTIONS = {"👍"}  # thumbs up
 
 
 def setup_logging(level: str = "info") -> None:
@@ -146,7 +147,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
 
 
 async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
-    """Forward negatively reacted messages to false_positive_entity."""
+    """Forward reacted messages to true/false positive entities."""
 
     if not update or not hasattr(update, "reactions"):
         return
@@ -157,28 +158,38 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         if isinstance(reaction, types.ReactionEmoji):
             emojis.append(reaction.emoticon)
 
-    if not any(e in NEGATIVE_REACTIONS for e in emojis):
+    positive = any(e in POSITIVE_REACTIONS for e in emojis)
+    negative = any(e in NEGATIVE_REACTIONS for e in emojis)
+    if not (positive or negative):
         return
 
     peer_id = await telegram_utils.to_event_chat_id(update.peer)
     for inst in instances:
-        if not inst.false_positive_entity or not inst.target_entity:
+        if not inst.target_entity:
             continue
-        entity = await client.get_entity(inst.target_entity)
+        entity = await telegram_utils.get_entity(inst.target_entity)
         target_id = await telegram_utils.to_event_chat_id(entity)
         if peer_id != target_id:
+            continue
+
+        dest = None
+        if positive:
+            dest = inst.true_positive_entity
+        elif negative:
+            dest = inst.false_positive_entity
+        if not dest:
             continue
 
         message = await client.get_messages(update.peer, ids=update.msg_id)
         if not message:
             return
-        forwarded = await message.forward_to(inst.false_positive_entity)
+        forwarded = await message.forward_to(dest)
         f_url = get_message_url(forwarded) if forwarded else None
         logger.info(
             "Forwarded message %s from %s to %s for %s (target url: %s)",
             message.id,
             inst.target_entity,
-            inst.false_positive_entity,
+            dest,
             inst.name,
             f_url,
         )

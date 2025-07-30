@@ -19,6 +19,7 @@ class Instance:
     target_chat: int | None = None
     target_entity: str | None = None
     false_positive_entity: str | None = None
+    true_positive_entity: str | None = None
     folders: List[str] = field(default_factory=list)
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
@@ -61,6 +62,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "target_chat": config.get("target_chat"),
                     "target_entity": config.get("target_entity"),
                     "false_positive_entity": config.get("false_positive_entity"),
+                    "true_positive_entity": config.get("true_positive_entity"),
                 }
             ]
         }
@@ -91,6 +93,7 @@ async def load_instances(config: dict) -> List[Instance]:
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
             false_positive_entity=inst_cfg.get("false_positive_entity"),
+            true_positive_entity=inst_cfg.get("true_positive_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
             prompts=parsed_prompts,
         )
