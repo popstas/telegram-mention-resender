@@ -20,3 +20,4 @@ instances:
     target_chat: 0
     target_entity: ""
     false_positive_entity: ""
+    true_positive_entity: ""

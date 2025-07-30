@@ -17,6 +17,9 @@ async def test_get_chat_name_with_cache_and_client(monkeypatch):
 
     tgu.client = DummyClient()
     tgu.entity_name_cache.clear()
+    tgu.entity_cache.clear()
+    tgu.entity_cache.clear()
+    tgu.entity_cache.clear()
 
     name = await tgu.get_chat_name("id1", safe=True)
     assert name == "Chat_Name"
@@ -34,6 +37,7 @@ async def test_get_chat_name_error(monkeypatch):
 
     tgu.client = FailClient()
     tgu.entity_name_cache.clear()
+    tgu.entity_cache.clear()
 
     name = await tgu.get_chat_name("https://t.me/testchat?param=1", safe=True)
     assert name == "testchat"
@@ -55,6 +59,7 @@ async def test_get_chat_name_various(monkeypatch, entity, expected):
 
     tgu.client = DummyClient()
     tgu.entity_name_cache.clear()
+    tgu.entity_cache.clear()
     result = await tgu.get_chat_name("identifier", safe=True)
     assert result == expected
 
@@ -90,10 +95,32 @@ async def test_resolve_entities(monkeypatch):
 
     tgu.client = DummyClient()
     monkeypatch.setattr(tgu, "get_peer_id", lambda e: e.id)
+    tgu.entity_cache.clear()
+    tgu.entity_name_cache.clear()
 
     result = await tgu.resolve_entities(["1", "bad", "2", "1"])
     assert result == {1, 2}
-    assert calls == ["1", "bad", "2", "1"]
+    assert calls == ["1", "bad", "2"]
+
+
+@pytest.mark.asyncio
+async def test_get_entity_cached(monkeypatch):
+    calls = []
+
+    class DummyClient:
+        async def get_entity(self, ident):
+            calls.append(ident)
+            return SimpleNamespace(name=ident)
+
+    tgu.client = DummyClient()
+    tgu.entity_cache.clear()
+    tgu.entity_name_cache.clear()
+
+    ent1 = await tgu.get_entity("id")
+    assert getattr(ent1, "name") == "id"
+    ent2 = await tgu.get_entity("id")
+    assert getattr(ent2, "name") == "id"
+    assert calls == ["id"]
 
 
 @pytest.mark.asyncio
@@ -106,6 +133,8 @@ async def test_get_entity_name_from_int(monkeypatch):
             return SimpleNamespace(title="Chat")
 
     tgu.client = DummyClient()
+    tgu.entity_name_cache.clear()
+    tgu.entity_cache.clear()
     name = await tgu.get_entity_name(-1000000000042, safe=True)
     assert name == "Chat"
     assert recorded and issubclass(recorded[0], tgu.types.PeerChannel)
