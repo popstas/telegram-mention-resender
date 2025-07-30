@@ -29,7 +29,7 @@ instances: List[Instance] = []
 # Use shared stats tracker
 stats = global_stats
 
-NEGATIVE_REACTIONS = {"\U0001F44E"}  # thumbs down
+NEGATIVE_REACTIONS = {"👎"}  # thumbs down
 
 
 def setup_logging(level: str = "info") -> None:
@@ -164,15 +164,14 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
     for inst in instances:
         if not inst.false_positive_entity or not inst.target_entity:
             continue
-        target_id = await telegram_utils.to_event_chat_id(inst.target_entity)
+        entity = await client.get_entity(inst.target_entity)
+        target_id = await telegram_utils.to_event_chat_id(entity)
         if peer_id != target_id:
             continue
 
         message = await client.get_messages(update.peer, ids=update.msg_id)
         if not message:
             return
-        text = await get_forward_message_text(message)
-        await client.send_message(inst.false_positive_entity, text)
         forwarded = await message.forward_to(inst.false_positive_entity)
         f_url = get_message_url(forwarded) if forwarded else None
         logger.info(

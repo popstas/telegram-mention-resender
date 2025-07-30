@@ -48,7 +48,7 @@ async def match_prompt(
             "content": (
                 f"{prompt.prompt}\n\n"
                 "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
-                "Cite most similar text fragment."
+                "Cite most similar text fragment without change in main_fragment field."
             ),
         },
         {"role": "user", "content": text},

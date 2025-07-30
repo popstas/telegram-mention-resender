@@ -214,14 +214,14 @@ async def test_ignore_usernames(
 
 @pytest.mark.asyncio
 async def test_false_positive_reaction(monkeypatch, dummy_message_cls):
-    sent = []
+    msg = dummy_message_cls(SimpleNamespace(channel_id=77), msg_id=5, text="hi")
 
     class DummyClient:
-        async def send_message(self, *args, **kwargs):
-            sent.append((args, kwargs))
-
         async def get_messages(self, peer, ids):
             return msg
+
+        async def get_entity(self, ident):
+            return SimpleNamespace(channel_id=77)
 
     app.client = DummyClient()
     inst = app.Instance(
@@ -231,8 +231,6 @@ async def test_false_positive_reaction(monkeypatch, dummy_message_cls):
         false_positive_entity="fp",
     )
     app.instances = [inst]
-
-    msg = dummy_message_cls(SimpleNamespace(channel_id=77), msg_id=5, text="hi")
 
     update = tgu.types.UpdateMessageReactions(
         peer=tgu.types.PeerChannel(77),
@@ -253,7 +251,6 @@ async def test_false_positive_reaction(monkeypatch, dummy_message_cls):
 
     await app.handle_reaction(update)
 
-    assert sent[0][0][0] == "fp"
     assert msg.forwarded == ["fp"]
 
 
