@@ -30,7 +30,7 @@ pip install -r requirements.txt
 - `ignore_usernames` – list of usernames to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `ignore_words`, `target_chat`,
-  `target_entity` and `folder_mute`.
+  `target_entity`, `folder_mute` and `false_positive_entity`.
 
 ## Running
 
