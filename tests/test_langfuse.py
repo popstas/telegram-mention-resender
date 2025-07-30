@@ -1,4 +1,5 @@
 import asyncio
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +33,9 @@ def test_init_langfuse(monkeypatch):
     client = lfu.init_langfuse(cfg)
     assert client == "client"
     assert recorded == {"public_key": "pk", "secret_key": "sk", "host": "url"}
+    assert os.environ["LANGFUSE_PUBLIC_KEY"] == "pk"
+    assert os.environ["LANGFUSE_SECRET_KEY"] == "sk"
+    assert os.environ["LANGFUSE_HOST"] == "url"
 
 
 @pytest.mark.asyncio
@@ -61,6 +65,7 @@ async def test_match_prompt_logs(monkeypatch):
     res = await prompts.match_prompt(prompt, "text", "i", "c")
 
     assert res == result_obj
-    assert dummy.traces[0]["input"] == {"prompt": "p", "text": "text"}
+    assert dummy.traces[0]["name"] == "p"
+    assert dummy.traces[0]["input"] == "text"
     assert dummy.traces[0]["output"] == result_obj.model_dump()
     assert recorded["metadata"] == {"langfuse_tags": ["i", "c"]}

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import httpx
 
 try:
-    from langfuse import get_client, observe
+    from langfuse import observe  # type: ignore
     from langfuse.openai import openai  # type: ignore
 except Exception:  # pragma: no cover - optional integration
     import openai  # type: ignore
@@ -16,15 +16,12 @@ except Exception:  # pragma: no cover - optional integration
 
         return decorator
 
-    def get_client():  # type: ignore[override]
-        return None
-
 
 from pydantic import BaseModel
 
 from .stats import StatsTracker
 
-langfuse = get_client()
+langfuse = None
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +96,8 @@ async def match_prompt(
     if langfuse is not None:
         try:
             langfuse.update_current_trace(
-                input={"prompt": prompt.prompt, "text": text},
+                name=prompt.name,
+                input=text,
                 output=result.model_dump(),
             )
         except Exception as exc:  # pragma: no cover - optional external call

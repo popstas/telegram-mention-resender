@@ -26,7 +26,7 @@ client: TelegramClient | None = None
 config: dict = {}
 instances: List[Instance] = []
 
-langfuse_client = None
+langfuse = None
 
 # Use shared stats tracker
 stats = global_stats
@@ -202,9 +202,9 @@ async def main() -> None:
     global client, instances, config
     config = load_config()
     prompts.config.update(config)
-    global langfuse_client
-    langfuse_client = langfuse_utils.init_langfuse(config)
-    prompts.langfuse_client = langfuse_client
+    global langfuse
+    langfuse = langfuse_utils.init_langfuse(config)
+    prompts.langfuse = langfuse
 
     setup_logging(config.get("log_level", "info"))
 
