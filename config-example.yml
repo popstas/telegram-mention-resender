@@ -15,6 +15,7 @@ instances:
     folders: []
     folder_mute: false
     words: ["my username"]
+    negative_words: []
     ignore_words: []
     prompts:
       - name: example

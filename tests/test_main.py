@@ -141,10 +141,22 @@ def test_load_instances_ignore_words():
     assert instances[0].ignore_words == ["bad"]
 
 
+def test_load_instances_negative_words():
+    config = {"instances": [{"name": "i", "words": [], "negative_words": ["bad"]}]}
+    instances = asyncio.run(config_module.load_instances(config))
+    assert instances[0].negative_words == ["bad"]
+
+
 def test_load_instances_ignore_words_backward():
     config = {"words": [], "ignore_words": ["bad"]}
     instances = asyncio.run(config_module.load_instances(config))
     assert instances[0].ignore_words == ["bad"]
+
+
+def test_load_instances_negative_words_backward():
+    config = {"words": [], "negative_words": ["bad"]}
+    instances = asyncio.run(config_module.load_instances(config))
+    assert instances[0].negative_words == ["bad"]
 
 
 @pytest.mark.asyncio
