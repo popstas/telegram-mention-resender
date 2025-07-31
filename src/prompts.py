@@ -48,6 +48,17 @@ class Prompt:
     config: dict | None = None
 
 
+def build_prompt(prompt: Prompt) -> str:
+    """Construct final system prompt for LLM evaluation."""
+    compiled = (
+        f"{prompt.prompt}\n\n"
+        "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
+        "Cite most similar text fragment without change in main_fragment field."
+    )
+    prompt._compiled_prompt = compiled
+    return compiled
+
+
 async def load_langfuse_prompt(prompt: Prompt):
     """Populate ``prompt.prompt`` from Langfuse if ``langfuse_name`` is set.
 
@@ -101,6 +112,7 @@ async def load_langfuse_prompt(prompt: Prompt):
     prompt.prompt = lf_prompt.prompt
     prompt.langfuse_version = getattr(lf_prompt, "version", prompt.langfuse_version)
     prompt._lf_prompt = lf_prompt
+    build_prompt(prompt)
 
     return lf_prompt
 
@@ -128,15 +140,11 @@ async def match_prompt(
     client = openai.OpenAI(api_key=config["openai_api_key"], http_client=http_client)
     model = config.get("openai_model", "gpt-4.1-mini")
 
+    if not getattr(prompt, "_compiled_prompt", None):
+        build_prompt(prompt)
+
     messages = [
-        {
-            "role": "system",
-            "content": (
-                f"{prompt.prompt}\n\n"
-                "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
-                "Cite most similar text fragment without change in main_fragment field."
-            ),
-        },
+        {"role": "system", "content": prompt._compiled_prompt},
         {"role": "user", "content": text},
     ]
     try:
@@ -145,13 +153,19 @@ async def match_prompt(
         if tags:
             metadata["langfuse_tags"] = tags
         extra = getattr(getattr(prompt, "_lf_prompt", None), "config", None) or {}
+        params = {
+            "model": extra.get("model", model),
+            "messages": messages,
+            "response_format": EvaluateResult,
+            "metadata": metadata or None,
+        }
+        if "temperature" in extra:
+            params["temperature"] = extra["temperature"]
+        if "top_p" in extra:
+            params["top_p"] = extra["top_p"]
         completion = await asyncio.to_thread(
             client.chat.completions.parse,
-            model=model,
-            messages=messages,
-            response_format=EvaluateResult,
-            metadata=metadata or None,
-            **extra,
+            **params,
         )
         result = completion.choices[0].message.parsed
         tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
@@ -164,11 +178,13 @@ async def match_prompt(
 
     if langfuse is not None:
         try:
+            langfuse.update_current_generation(
+                prompt=getattr(prompt, "_lf_prompt", None)
+            )
             langfuse.update_current_trace(
                 name=prompt.name,
                 input=text,
                 output=result.model_dump(),
-                prompt=getattr(prompt, "_lf_prompt", None),
             )
         except Exception as exc:  # pragma: no cover - optional external call
             logger.error("Failed to log Langfuse trace: %s", exc)

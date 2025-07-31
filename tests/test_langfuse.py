@@ -12,9 +12,13 @@ class DummyLangfuse:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.traces = []
+        self.generations = []
 
     def update_current_trace(self, **kwargs):
         self.traces.append(kwargs)
+
+    def update_current_generation(self, **kwargs):  # noqa: D401 - test stub
+        self.generations.append(kwargs)
 
 
 def test_init_langfuse(monkeypatch):
@@ -71,7 +75,8 @@ async def test_match_prompt_logs(monkeypatch):
     assert dummy.traces[0]["name"] == "p"
     assert dummy.traces[0]["input"] == "text"
     assert dummy.traces[0]["output"] == result_obj.model_dump()
-    assert dummy.traces[0]["prompt"] is None
+    assert "prompt" not in dummy.traces[0]
+    assert dummy.generations[0]["prompt"] is None
     assert recorded["metadata"] == {"langfuse_tags": ["i", "c"]}
 
 
@@ -184,4 +189,6 @@ async def test_match_prompt_lf_config(monkeypatch):
 
     assert res == result_obj
     assert recorded["temperature"] == 0.1
-    assert dummy.traces[0]["prompt"] is lf_prompt
+    assert dummy.generations[0]["prompt"] is lf_prompt
+    assert "prompt" not in dummy.traces[0]
+    assert hasattr(p, "_compiled_prompt")

@@ -43,6 +43,7 @@ def setup_logging(level: str = "info") -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("langfuse").setLevel(logging.WARNING)
 
 
 async def update_instance_chat_ids(instance: Instance, first_run: bool = False) -> None:
