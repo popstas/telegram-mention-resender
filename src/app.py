@@ -234,6 +234,10 @@ async def main() -> None:
     @client.on(events.NewMessage)
     async def handler(event: events.NewMessage.Event) -> None:
         username = getattr(getattr(event.message, "sender", None), "username", None)
+        user_id = getattr(getattr(event.message, "sender", None), "id", None)
+        if user_id and user_id in config.get("ignore_user_ids", []):
+            logger.debug("Ignoring message from id %s", user_id)
+            return
         if username and username.lower() in [
             u.lower() for u in config.get("ignore_usernames", [])
         ]:

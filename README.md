@@ -31,6 +31,7 @@ pip install -r requirements.txt
 - `langfuse_secret_key` – (optional) secret key for Langfuse.
 - `langfuse_base_url` – (optional) custom Langfuse API URL.
 - `ignore_usernames` – list of usernames to ignore when processing messages.
+- `ignore_user_ids` – list of user IDs to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `ignore_words`, `target_chat`,
   `target_entity`, `folder_mute`, `false_positive_entity` and `true_positive_entity`.
