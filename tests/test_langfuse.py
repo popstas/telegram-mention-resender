@@ -76,7 +76,8 @@ async def test_match_prompt_logs(monkeypatch):
     assert dummy.traces[0]["input"] == "text"
     assert dummy.traces[0]["output"] == result_obj.model_dump()
     assert "prompt" not in dummy.traces[0]
-    assert dummy.generations[0]["prompt"] is None
+    # generation logging was removed, ensure nothing recorded
+    assert dummy.generations == []
     assert recorded["metadata"] == {"langfuse_tags": ["i", "c"]}
 
 
@@ -94,9 +95,11 @@ async def test_load_langfuse_prompt(monkeypatch):
 
     p = prompts.Prompt(langfuse_name="n", langfuse_label="prod")
     lf = await prompts.load_langfuse_prompt(p)
-    assert p.prompt == "loaded"
+    # prompt text stays unchanged, but fetched prompt is stored on the object
+    assert p.prompt is None
     assert p.langfuse_version == 1
     assert p._lf_prompt is lf
+    assert p._lf_prompt.prompt == "loaded"
     assert recorded["name"] == "n"
     assert recorded["kwargs"] == {"type": "text", "label": "prod"}
 
@@ -154,7 +157,8 @@ async def test_load_langfuse_prompt_new_version(monkeypatch):
     assert p.prompt == "new"
     assert p.langfuse_version == 3
     assert p._lf_prompt is lf
-    assert calls["prompt"] == "new"
+    expected_text = prompts.build_prompt(prompts.Prompt(prompt="new"))
+    assert calls["prompt"] == expected_text
     assert calls["name"] == "n"
     assert calls["labels"] == ["prod"]
 
@@ -189,6 +193,7 @@ async def test_match_prompt_lf_config(monkeypatch):
 
     assert res == result_obj
     assert recorded["temperature"] == 0.1
-    assert dummy.generations[0]["prompt"] is lf_prompt
+    # generation logging was removed
+    assert dummy.generations == []
     assert "prompt" not in dummy.traces[0]
     assert hasattr(p, "_compiled_prompt")
