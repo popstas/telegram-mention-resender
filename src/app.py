@@ -89,6 +89,13 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             inst.name,
         )
         return
+    if message.raw_text and word_in_text(inst.negative_words, message.raw_text):
+        logger.debug(
+            "Ignoring message %s for %s due to negative_words",
+            message.id,
+            inst.name,
+        )
+        return
     stats.increment(inst.name)
     chat_name = await get_chat_name(event.chat_id, safe=True)
     forward = False

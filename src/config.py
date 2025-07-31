@@ -15,6 +15,7 @@ class Instance:
 
     name: str
     words: List[str]
+    negative_words: List[str] = field(default_factory=list)
     ignore_words: List[str] = field(default_factory=list)
     target_chat: int | None = None
     target_entity: str | None = None
@@ -58,6 +59,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "chat_ids": config.get("chat_ids", []),
                     "entities": config.get("entities", []),
                     "words": config.get("words", []),
+                    "negative_words": config.get("negative_words", []),
                     "ignore_words": config.get("ignore_words", []),
                     "target_chat": config.get("target_chat"),
                     "target_entity": config.get("target_entity"),
@@ -94,6 +96,7 @@ async def load_instances(config: dict) -> List[Instance]:
             chat_ids=set(inst_cfg.get("chat_ids", [])),
             entities=inst_cfg.get("entities", []),
             words=inst_cfg.get("words", []),
+            negative_words=inst_cfg.get("negative_words", []),
             ignore_words=inst_cfg.get("ignore_words", []),
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),

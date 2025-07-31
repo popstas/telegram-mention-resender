@@ -403,3 +403,57 @@ async def test_ignore_words(monkeypatch, dummy_tg_client, dummy_message_cls, tmp
     assert msg.forwarded == []
     assert dummy_client.sent == []
     assert app.stats.data["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_negative_words(
+    monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path
+):
+    config = {"log_level": "info"}
+    monkeypatch.setattr(app, "load_config", lambda: config)
+    monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
+
+    dummy_client = dummy_tg_client
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+
+    stats_path = tmp_path / "stats.json"
+    monkeypatch.setattr(
+        app, "stats", stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    )
+
+    async def fake_rescan(inst):
+        return None
+
+    monkeypatch.setattr(app, "rescan_loop", fake_rescan)
+
+    async def fake_update(inst, fr):
+        inst.chat_ids = {1}
+
+    monkeypatch.setattr(app, "update_instance_chat_ids", fake_update)
+
+    async def fake_load_instances(cfg):
+        return [
+            app.Instance(name="i", words=["hi"], negative_words=["bad"], target_chat=99)
+        ]
+
+    monkeypatch.setattr(app, "load_instances", fake_load_instances)
+
+    async def fake_get_message_source(m):
+        return "URL"
+
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+
+    async def fake_get_chat_name(v, safe=False):
+        return "name"
+
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+
+    await app.main()
+
+    handler = dummy_client.on_handler
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="bad hi")
+    event = SimpleNamespace(message=msg, chat_id=1)
+    await handler(event)
+    assert msg.forwarded == []
+    assert dummy_client.sent == []
+    assert app.stats.data["total"] == 0
