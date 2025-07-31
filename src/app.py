@@ -43,6 +43,11 @@ def setup_logging(level: str = "info") -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("langfuse").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
 
 
 async def update_instance_chat_ids(instance: Instance, first_run: bool = False) -> None:
@@ -217,6 +222,7 @@ async def main() -> None:
     prompts.stats = stats
 
     instances = await load_instances(config)
+    await prompts.load_langfuse_prompts(instances)
     for inst in instances:
         await update_instance_chat_ids(inst, True)
         asyncio.create_task(rescan_loop(inst))

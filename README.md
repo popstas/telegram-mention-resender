@@ -53,6 +53,16 @@ The bot uses the Langfuse OpenAI integration, so all OpenAI calls are
 automatically traced. Each request is tagged with the instance name and chat
 name to make debugging easier.
 
+#### Langfuse prompts
+
+Prompts used for LLM evaluation can be stored in Langfuse. Set
+`langfuse_name`, `langfuse_label`, `langfuse_version`, or `langfuse_type`
+under a prompt entry in the config to fetch the text from Langfuse at startup.
+When the local text differs from Langfuse, a new version is automatically
+created and `langfuse_version` updated. The optional `config` field is forwarded
+to Langfuse when creating versions. See `config-example.yml` for an example.
+The compiled prompt is linked to Langfuse generations via `update_current_generation`.
+
 ## Development
 
 It is built using [Telethon](https://github.com/LonamiWebs/Telethon).
