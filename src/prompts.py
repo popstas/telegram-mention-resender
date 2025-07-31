@@ -42,7 +42,7 @@ class Prompt:
     prompt: str | None = None
     threshold: int = 4
     langfuse_name: str | None = None
-    langfuse_label: str | None = None
+    langfuse_label: str = "latest"
     langfuse_version: int | None = None
     langfuse_type: str = "text"
     config: dict | None = None
@@ -75,7 +75,8 @@ async def load_langfuse_prompt(prompt: Prompt):
     if prompt.langfuse_label is not None:
         kwargs["label"] = prompt.langfuse_label
 
-    local_text = prompt.prompt
+    # local_text = prompt.prompt
+    local_text = build_prompt(prompt)
 
     try:
         lf_prompt = langfuse.get_prompt(prompt.langfuse_name, **kwargs)
@@ -109,7 +110,7 @@ async def load_langfuse_prompt(prompt: Prompt):
                 )
                 # fall back to fetched prompt
 
-    prompt.prompt = lf_prompt.prompt
+    # prompt.prompt = lf_prompt.prompt
     prompt.langfuse_version = getattr(lf_prompt, "version", prompt.langfuse_version)
     prompt._lf_prompt = lf_prompt
     build_prompt(prompt)
@@ -163,6 +164,9 @@ async def match_prompt(
             params["temperature"] = extra["temperature"]
         if "top_p" in extra:
             params["top_p"] = extra["top_p"]
+        if langfuse is not None:
+            params["langfuse_prompt"] = getattr(prompt, "_lf_prompt", None)
+
         completion = await asyncio.to_thread(
             client.chat.completions.parse,
             **params,
@@ -178,9 +182,9 @@ async def match_prompt(
 
     if langfuse is not None:
         try:
-            langfuse.update_current_generation(
-                prompt=getattr(prompt, "_lf_prompt", None)
-            )
+            # langfuse.update_current_generation(
+            #     prompt=getattr(prompt, "_lf_prompt", None)
+            # )
             langfuse.update_current_trace(
                 name=prompt.name,
                 input=text,

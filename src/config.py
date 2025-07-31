@@ -79,7 +79,7 @@ async def load_instances(config: dict) -> List[Instance]:
                         prompt=p.get("prompt"),
                         threshold=p.get("threshold", 4),
                         langfuse_name=p.get("langfuse_name"),
-                        langfuse_label=p.get("langfuse_label"),
+                        langfuse_label=p.get("langfuse_label", "latest"),
                         langfuse_version=p.get("langfuse_version"),
                         langfuse_type=p.get("langfuse_type", "text"),
                         config=p.get("config"),
