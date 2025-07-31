@@ -20,6 +20,14 @@ instances:
       - name: example
         prompt: Сообщение содержит недовольство.
         threshold: 4
+        # Uncomment to load prompt text from Langfuse
+        # langfuse_name: movie-critic
+        # langfuse_label: production
+        # langfuse_version: 1
+        # langfuse_type: text
+        # config:
+        #   model: gpt-4o
+        #   temperature: 0.7
     target_chat: 0
     target_entity: ""
     false_positive_entity: ""

@@ -17,9 +17,14 @@ except Exception:  # pragma: no cover - optional integration
         return decorator
 
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from .stats import StatsTracker
+
+if TYPE_CHECKING:  # pragma: no cover - used for type hints only
+    from .config import Instance
 
 langfuse = None
 
@@ -36,6 +41,68 @@ class Prompt:
     name: str | None = None
     prompt: str | None = None
     threshold: int = 4
+    langfuse_name: str | None = None
+    langfuse_label: str | None = None
+    langfuse_version: int | None = None
+    langfuse_type: str = "text"
+    config: dict | None = None
+
+
+async def load_langfuse_prompt(prompt: Prompt):
+    """Populate ``prompt.prompt`` from Langfuse if ``langfuse_name`` is set.
+
+    If the prompt doesn't exist in Langfuse it will be created. If the text in
+    Langfuse differs from the one in the local config, a new version will be
+    created and ``langfuse_version`` updated.
+    """
+    if langfuse is None or not prompt.langfuse_name:
+        return None
+
+    kwargs = {"type": prompt.langfuse_type}
+    if prompt.langfuse_version is not None:
+        kwargs["version"] = prompt.langfuse_version
+    if prompt.langfuse_label is not None:
+        kwargs["label"] = prompt.langfuse_label
+
+    local_text = prompt.prompt
+
+    try:
+        lf_prompt = langfuse.get_prompt(prompt.langfuse_name, **kwargs)
+    except Exception:  # pragma: no cover - optional external call
+        try:
+            lf_prompt = langfuse.create_prompt(
+                name=prompt.langfuse_name,
+                prompt=local_text or "",
+                labels=[prompt.langfuse_label] if prompt.langfuse_label else [],
+                type=prompt.langfuse_type,
+                config=prompt.config,
+            )
+        except Exception as exc:  # pragma: no cover - optional external call
+            logger.error(
+                "Failed to create Langfuse prompt %s: %s", prompt.langfuse_name, exc
+            )
+            return None
+    else:
+        if local_text is not None and lf_prompt.prompt != local_text:
+            try:
+                lf_prompt = langfuse.create_prompt(
+                    name=prompt.langfuse_name,
+                    prompt=local_text,
+                    labels=[prompt.langfuse_label] if prompt.langfuse_label else [],
+                    type=prompt.langfuse_type,
+                    config=prompt.config,
+                )
+            except Exception as exc:  # pragma: no cover - optional external call
+                logger.error(
+                    "Failed to create Langfuse prompt %s: %s", prompt.langfuse_name, exc
+                )
+                # fall back to fetched prompt
+
+    prompt.prompt = lf_prompt.prompt
+    prompt.langfuse_version = getattr(lf_prompt, "version", prompt.langfuse_version)
+    prompt._lf_prompt = lf_prompt
+
+    return lf_prompt
 
 
 class EvaluateResult(BaseModel):
@@ -77,12 +144,14 @@ async def match_prompt(
         tags = [t for t in [inst_name, chat_name] if t]
         if tags:
             metadata["langfuse_tags"] = tags
+        extra = getattr(getattr(prompt, "_lf_prompt", None), "config", None) or {}
         completion = await asyncio.to_thread(
             client.chat.completions.parse,
             model=model,
             messages=messages,
             response_format=EvaluateResult,
             metadata=metadata or None,
+            **extra,
         )
         result = completion.choices[0].message.parsed
         tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
@@ -99,8 +168,16 @@ async def match_prompt(
                 name=prompt.name,
                 input=text,
                 output=result.model_dump(),
+                prompt=getattr(prompt, "_lf_prompt", None),
             )
         except Exception as exc:  # pragma: no cover - optional external call
             logger.error("Failed to log Langfuse trace: %s", exc)
 
     return result
+
+
+async def load_langfuse_prompts(instances: list["Instance"]) -> None:
+    """Load prompt texts from Langfuse for all provided instances."""
+    for inst in instances:
+        for p in inst.prompts:
+            await load_langfuse_prompt(p)

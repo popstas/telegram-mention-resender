@@ -217,6 +217,7 @@ async def main() -> None:
     prompts.stats = stats
 
     instances = await load_instances(config)
+    await prompts.load_langfuse_prompts(instances)
     for inst in instances:
         await update_instance_chat_ids(inst, True)
         asyncio.create_task(rescan_loop(inst))
