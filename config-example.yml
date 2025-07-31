@@ -8,6 +8,7 @@ langfuse_public_key: ""
 langfuse_secret_key: ""
 langfuse_base_url: ""
 ignore_usernames: []
+ignore_user_ids: []
 instances:
   - name: default
     entities:
