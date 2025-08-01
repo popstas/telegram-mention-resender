@@ -128,7 +128,8 @@ def get_forward_reason_text(
     prompt=None,
     score: int | None = None,
     word: str | None = None,
-    fragment: str | None = None,
+    quote: str | None = None,
+    reasoning: str | None = None,
 ) -> str:
     """Return human-readable reason for forwarding a message."""
     if word:
@@ -136,8 +137,10 @@ def get_forward_reason_text(
     if prompt is not None and score is not None:
         name = getattr(prompt, "name", None) or "prompt"
         reason = f"{name}: {score}/5"
-        if fragment:
-            reason += f" - `{fragment}`"
+        if quote:
+            reason += f" - `{quote}`"
+        if reasoning:
+            return f"{reason}\n\n{reasoning}"
         return reason
     return ""
 
@@ -148,11 +151,16 @@ async def get_forward_message_text(
     prompt=None,
     score: int | None = None,
     word: str | None = None,
-    fragment: str | None = None,
+    quote: str | None = None,
+    reasoning: str | None = None,
 ) -> str:
     """Return text to send before forwarding ``message``."""
     reason = get_forward_reason_text(
-        prompt=prompt, score=score, word=word, fragment=fragment
+        prompt=prompt,
+        score=score,
+        word=word,
+        quote=quote,
+        reasoning=reasoning,
     )
     source = await get_message_source(message)
     if reason:

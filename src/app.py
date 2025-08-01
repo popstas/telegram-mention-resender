@@ -106,7 +106,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
     used_word: str | None = None
     used_prompt: Prompt | None = None
     used_score = 0
-    used_fragment: str | None = None
+    used_quote: str | None = None
+    used_reasoning: str | None = None
 
     if message.raw_text:
         w = find_word(inst.words, message.raw_text)
@@ -116,11 +117,12 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
         else:
             for p in inst.prompts:
                 res = await match_prompt(p, message.raw_text, inst.name, chat_name)
-                sc = res.similarity
+                sc = res.score
                 if sc > used_score:
                     used_score = sc
                     used_prompt = p
-                    used_fragment = res.main_fragment
+                    used_quote = res.quote
+                    used_reasoning = res.reasoning
                 if sc >= (p.threshold or 4):
                     forward = True
                     break
@@ -132,7 +134,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                     prompt=used_prompt,
                     score=used_score,
                     word=used_word,
-                    fragment=used_fragment,
+                    quote=used_quote,
+                    reasoning=used_reasoning,
                 )
             destinations = []
             dest_names = []
