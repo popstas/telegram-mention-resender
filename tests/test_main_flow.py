@@ -163,6 +163,42 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_process_message_no_forward_message(
+    monkeypatch, dummy_message_cls, tmp_path
+):
+    sent = []
+
+    class DummyClient:
+        async def send_message(self, *a, **k):
+            sent.append((a, k))
+
+    app.client = DummyClient()
+    tgu.client = app.client
+    app.stats = stats_module.StatsTracker(
+        str(tmp_path / "stats.json"), flush_interval=0
+    )
+
+    inst = app.Instance(name="n", words=["hi"], target_chat=1, no_forward_message=True)
+
+    async def fake_get_message_source(msg):
+        return "src"
+
+    async def fake_get_chat_name(v, safe=False):
+        return "n"
+
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    monkeypatch.setattr(app, "get_chat_name", fake_get_chat_name)
+
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=8, text="hi")
+    event = SimpleNamespace(message=msg, chat_id=1)
+    await app.process_message(inst, event)
+
+    assert sent == []
+    assert msg.forwarded == [1]
+
+
+@pytest.mark.asyncio
 async def test_ignore_usernames(
     monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path
 ):

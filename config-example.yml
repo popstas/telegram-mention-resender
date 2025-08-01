@@ -15,6 +15,7 @@ instances:
       - https://t.me/tboom_66
     folders: []
     folder_mute: false
+    no_forward_message: false
     words: ["my username"]
     negative_words: []
     ignore_words: []

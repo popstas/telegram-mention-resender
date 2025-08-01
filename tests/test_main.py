@@ -135,6 +135,12 @@ def test_load_instances_folder_mute():
     assert instances[0].folder_mute is True
 
 
+def test_load_instances_no_forward_message():
+    config = {"instances": [{"name": "n", "words": [], "no_forward_message": True}]}
+    instances = asyncio.run(config_module.load_instances(config))
+    assert instances[0].no_forward_message is True
+
+
 def test_load_instances_ignore_words():
     config = {"instances": [{"name": "i", "words": [], "ignore_words": ["bad"]}]}
     instances = asyncio.run(config_module.load_instances(config))
