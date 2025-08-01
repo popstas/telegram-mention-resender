@@ -35,7 +35,8 @@ pip install -r requirements.txt
 - `ignore_user_ids` – list of user IDs to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `negative_words`, `ignore_words`, `target_chat`,
-  `target_entity`, `folder_mute`, `false_positive_entity` and `true_positive_entity`.
+  `target_entity`, `folder_mute`, `false_positive_entity`, `true_positive_entity` and
+  `no_forward_message`.
 
 ## Running
 

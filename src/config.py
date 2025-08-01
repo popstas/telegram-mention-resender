@@ -25,6 +25,7 @@ class Instance:
     entities: List[str] = field(default_factory=list)
     chat_ids: Set[int] = field(default_factory=set)
     folder_mute: bool = False
+    no_forward_message: bool = False
     prompts: List[Prompt] = field(default_factory=list)
 
 
@@ -65,6 +66,7 @@ async def load_instances(config: dict) -> List[Instance]:
                     "target_entity": config.get("target_entity"),
                     "false_positive_entity": config.get("false_positive_entity"),
                     "true_positive_entity": config.get("true_positive_entity"),
+                    "no_forward_message": config.get("no_forward_message", False),
                 }
             ]
         }
@@ -103,6 +105,7 @@ async def load_instances(config: dict) -> List[Instance]:
             false_positive_entity=inst_cfg.get("false_positive_entity"),
             true_positive_entity=inst_cfg.get("true_positive_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
+            no_forward_message=inst_cfg.get("no_forward_message", False),
             prompts=parsed_prompts,
         )
         parsed_instances.append(instance)

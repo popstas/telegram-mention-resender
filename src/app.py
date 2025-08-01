@@ -126,13 +126,14 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                     break
     if forward:
         try:
-            text = await get_forward_message_text(
-                message,
-                prompt=used_prompt,
-                score=used_score,
-                word=used_word,
-                fragment=used_fragment,
-            )
+            if not inst.no_forward_message:
+                text = await get_forward_message_text(
+                    message,
+                    prompt=used_prompt,
+                    score=used_score,
+                    word=used_word,
+                    fragment=used_fragment,
+                )
             destinations = []
             dest_names = []
             if inst.target_chat is not None:
@@ -142,7 +143,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                 destinations.append(inst.target_entity)
                 dest_names.append(await get_chat_name(inst.target_entity, safe=True))
             for dest, dname in zip(destinations, dest_names):
-                await client.send_message(dest, text)
+                if not inst.no_forward_message:
+                    await client.send_message(dest, text)
                 forwarded = await message.forward_to(dest)
                 f_url = get_message_url(forwarded) if forwarded else None
                 logger.info(
