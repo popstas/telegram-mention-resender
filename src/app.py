@@ -34,6 +34,10 @@ stats = global_stats
 NEGATIVE_REACTIONS = {"👎"}  # thumbs down
 POSITIVE_REACTIONS = {"👍"}  # thumbs up
 
+# Track messages already forwarded for reactions
+forwarded_positive: set[tuple[int, int]] = set()
+forwarded_negative: set[tuple[int, int]] = set()
+
 
 def setup_logging(level: str = "info") -> None:
     """Configure logging for the application."""
@@ -178,6 +182,15 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         return
 
     peer_id = await telegram_utils.to_event_chat_id(update.peer)
+    key = (peer_id, update.msg_id)
+
+    if positive and key in forwarded_positive:
+        logger.debug("Skip message %s already forwarded as positive", key)
+        return
+    if negative and key in forwarded_negative:
+        logger.debug("Skip message %s already forwarded as negative", key)
+        return
+
     for inst in instances:
         if not inst.target_entity:
             continue
@@ -198,6 +211,10 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         if not message:
             return
         forwarded = await message.forward_to(dest)
+        if positive:
+            forwarded_positive.add(key)
+        elif negative:
+            forwarded_negative.add(key)
         f_url = get_message_url(forwarded) if forwarded else None
         logger.info(
             "Forwarded message %s from %s to %s for %s (target url: %s)",
