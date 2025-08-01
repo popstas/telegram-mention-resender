@@ -45,6 +45,10 @@ python -m src.main
 The application will listen to new messages in all configured instances and
 forward those containing any of the specified words to their target chats.
 
+Statistics about processed messages are stored in `data/stats.json`. If you
+have a file in the old format (without the `stats` section), it will be
+automatically converted on startup using the new `Stats` structure.
+
 ### Langfuse tracing
 
 Set `langfuse_public_key` and `langfuse_secret_key` in the config to enable

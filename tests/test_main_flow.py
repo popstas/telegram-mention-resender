@@ -110,10 +110,10 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_pa
     assert dummy_client.sent[0][0][0] == 99
     assert dummy_client.sent[1][0][0] == "name"
     data = json.loads(stats_path.read_text())
-    assert data["total"] == 1
+    assert data["stats"]["total"] == 1
     inst = data["instances"][0]
     assert inst["name"] == "i"
-    assert inst["total"] == 1
+    assert inst["stats"]["total"] == 1
 
 
 @pytest.mark.asyncio
@@ -212,7 +212,7 @@ async def test_ignore_usernames(
     await handler(event)
     assert msg.forwarded == []
     assert dummy_client.sent == []
-    assert app.stats.data["total"] == 0
+    assert app.stats.data["stats"]["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -265,7 +265,7 @@ async def test_ignore_user_ids(
     await handler(event)
     assert msg.forwarded == []
     assert dummy_client.sent == []
-    assert app.stats.data["total"] == 0
+    assert app.stats.data["stats"]["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -402,7 +402,7 @@ async def test_ignore_words(monkeypatch, dummy_tg_client, dummy_message_cls, tmp
     await handler(event)
     assert msg.forwarded == []
     assert dummy_client.sent == []
-    assert app.stats.data["total"] == 0
+    assert app.stats.data["stats"]["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -456,4 +456,4 @@ async def test_negative_words(
     await handler(event)
     assert msg.forwarded == []
     assert dummy_client.sent == []
-    assert app.stats.data["total"] == 0
+    assert app.stats.data["stats"]["total"] == 0
