@@ -50,13 +50,7 @@ class Prompt:
 
 def build_prompt(prompt: Prompt) -> str:
     """Construct final system prompt for LLM evaluation."""
-    compiled = (
-        f"{prompt.prompt}\n\n"
-        "Produce one JSON object with three keys only:\n"
-        '- "reasoning" \u2013 a short explanation (\u2264 100 chars, Russian)\n'
-        '- "quote" - \u2264200 original chars showing max dissatisfaction\n'
-        '- "score" \u2013 an integer 0-5'
-    )
+    compiled = f"{prompt.prompt}"
     prompt._compiled_prompt = compiled
     return compiled
 
@@ -181,7 +175,9 @@ async def match_prompt(
     except Exception as exc:  # pragma: no cover - external call
         logger.error("Failed to query OpenAI: %s", exc)
         result = EvaluateResult(score=0, reasoning="", quote="")
-    logger.debug("Prompt check: %s -> %s", prompt.name, result.score)
+    logger.debug(
+        '%s - %s: %s - "%s"', prompt.name, result.score, result.reasoning, result.quote
+    )
 
     if langfuse is not None:
         try:
