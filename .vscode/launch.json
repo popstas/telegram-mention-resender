@@ -11,6 +11,14 @@
             "program": "-m",
             "args": ["src.main"],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "generate_evals --suffix main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            "args": ["src.generate_evals", "--suffix", "main"],
+            "console": "integratedTerminal"
         }
     ]
 }
