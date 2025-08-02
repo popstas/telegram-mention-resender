@@ -11,6 +11,7 @@ matching messages to a target chat.
 - Multiple instances for different chats, words and targets
 - Each instance has target chat
 - Forwarded messages include a link to the original message
+- Prompt-triggered forwards include a short reason and quote from the message
 - Reactions (👍/👎) forward messages to true/false positive chats once per message
 
 ## Setup

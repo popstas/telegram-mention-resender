@@ -184,7 +184,9 @@ async def test_match_prompt(monkeypatch):
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(parsed=SimpleNamespace(similarity=3))
+                        message=SimpleNamespace(
+                            parsed=SimpleNamespace(score=3, reasoning="", quote="")
+                        )
                     )
                 ]
             )
@@ -197,7 +199,7 @@ async def test_match_prompt(monkeypatch):
     prompts.config["openai_api_key"] = "k"
     prompt = prompts.Prompt(name="p1", prompt="p1", threshold=2)
     result = await prompts.match_prompt(prompt, "msg", "i", "c")
-    assert result.similarity == 3
+    assert result.score == 3
     assert calls == ["p1"]
 
 
@@ -206,7 +208,7 @@ async def test_match_prompt_no_api(monkeypatch):
     prompts.config["openai_api_key"] = ""
     prompt = prompts.Prompt(name="n", prompt="hello")
     result = await prompts.match_prompt(prompt, "msg")
-    assert result == prompts.EvaluateResult(similarity=0, main_fragment="")
+    assert result == prompts.EvaluateResult(score=0, reasoning="", quote="")
 
 
 def test_get_forward_reason_text_word():
@@ -216,6 +218,11 @@ def test_get_forward_reason_text_word():
 def test_get_forward_reason_text_prompt():
     p = prompts.Prompt(name="n", prompt="p", threshold=4)
     assert tgu.get_forward_reason_text(prompt=p, score=4) == "n: 4/5"
+
+    text = tgu.get_forward_reason_text(
+        prompt=p, score=2, quote="q", reasoning="пояснение"
+    )
+    assert text == "n: 2/5 - `q`\n\nпояснение"
 
 
 @pytest.mark.asyncio
@@ -228,6 +235,10 @@ async def test_get_forward_message_text(monkeypatch, dummy_message_cls):
 
     monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
     text = await tgu.get_forward_message_text(
-        msg, prompt=prompts.Prompt(name="n", prompt="p"), score=4
+        msg,
+        prompt=prompts.Prompt(name="n", prompt="p"),
+        score=4,
+        quote="q",
+        reasoning="r",
     )
-    assert text == "n: 4/5\n\nsrc"
+    assert text == "n: 4/5 - `q`\n\nr\n\nsrc"

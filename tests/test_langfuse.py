@@ -51,7 +51,7 @@ async def test_match_prompt_logs(monkeypatch):
     monkeypatch.setattr(prompts, "langfuse", dummy)
     prompts.config["openai_api_key"] = "k"
 
-    result_obj = prompts.EvaluateResult(similarity=4, main_fragment="f")
+    result_obj = prompts.EvaluateResult(score=4, reasoning="", quote="f")
 
     recorded = {}
 
@@ -169,7 +169,7 @@ async def test_match_prompt_lf_config(monkeypatch):
     monkeypatch.setattr(prompts, "langfuse", dummy)
     prompts.config["openai_api_key"] = "k"
 
-    result_obj = prompts.EvaluateResult(similarity=3, main_fragment="f")
+    result_obj = prompts.EvaluateResult(score=3, reasoning="", quote="f")
     recorded = {}
 
     class DummyCompletions:

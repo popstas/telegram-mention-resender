@@ -17,9 +17,9 @@ except Exception:  # pragma: no cover - optional integration
         return decorator
 
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .stats import StatsTracker
 
@@ -50,11 +50,7 @@ class Prompt:
 
 def build_prompt(prompt: Prompt) -> str:
     """Construct final system prompt for LLM evaluation."""
-    compiled = (
-        f"{prompt.prompt}\n\n"
-        "Evaluate message similarity: 0 - not match at all, 5 - strongly match. "
-        "Cite most similar text fragment without change in main_fragment field."
-    )
+    compiled = f"{prompt.prompt}"
     prompt._compiled_prompt = compiled
     return compiled
 
@@ -121,8 +117,17 @@ async def load_langfuse_prompt(prompt: Prompt):
 class EvaluateResult(BaseModel):
     """Result returned by LLM evaluation."""
 
-    similarity: int
-    main_fragment: str = ""
+    reasoning: Annotated[
+        str, Field(max_length=100, description="Краткое объяснение без цитат, RU")
+    ] = ""
+    quote: Annotated[
+        str,
+        Field(
+            max_length=100,
+            description="Оригинальный фрагмент сообщения, демонстрирующий максимум недовольства",
+        ),
+    ] = ""
+    score: Annotated[int, Field(ge=0, le=5, description="Уровень")] = 0
 
 
 @observe()
@@ -134,7 +139,7 @@ async def match_prompt(
 ) -> EvaluateResult:
     """Return :class:`EvaluateResult` for ``text`` using OpenAI."""
     if not prompt.prompt or not config.get("openai_api_key"):
-        return EvaluateResult(similarity=0, main_fragment="")
+        return EvaluateResult(score=0, reasoning="", quote="")
 
     proxy = config.get("proxy_url")
     http_client = httpx.Client(proxy=proxy) if proxy else None
@@ -177,8 +182,10 @@ async def match_prompt(
             stats.add_tokens(inst_name, tokens)
     except Exception as exc:  # pragma: no cover - external call
         logger.error("Failed to query OpenAI: %s", exc)
-        result = EvaluateResult(similarity=0, main_fragment="")
-    logger.debug("Prompt check: %s -> %s", prompt.name, result.similarity)
+        result = EvaluateResult(score=0, reasoning="", quote="")
+    logger.debug(
+        '%s - %s: %s - "%s"', prompt.name, result.score, result.reasoning, result.quote
+    )
 
     if langfuse is not None:
         try:
