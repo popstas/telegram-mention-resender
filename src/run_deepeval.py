@@ -17,6 +17,12 @@ except Exception:  # pragma: no cover - optional dependency
     BaseMetric = object  # type: ignore
 
 
+async def run_prompt_match(prompt, text: str, threshold: int = 4) -> str:
+    """Run prompt match and return "true" or "false" based on score >= threshold."""
+    result = await prompts.match_prompt(prompt, text)
+    return "true" if result.score >= threshold else "false"
+
+
 async def run_deepeval(
     instance: str,
     prompt_name: str,
@@ -57,11 +63,14 @@ async def run_deepeval(
     test_cases = []
     for line in msg_path.read_text(encoding="utf-8").splitlines():
         row = json.loads(line)
+
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
-                actual_output=await prompts.match_prompt(prompt, row["input"]),
-                expected_output=row["expected"]["is_match"],
+                actual_output=await run_prompt_match(
+                    prompt, row["input"], prompt.threshold
+                ),
+                expected_output=str(row["expected"]["is_match"]).lower(),
             )
         )
 
@@ -82,14 +91,13 @@ async def run_deepeval(
 
         def measure(self, test_case: LLMTestCase) -> float:
             try:
-                result = test_case.actual_output  # объект с .score
-                border = (self._prompt.threshold or 0) if self._prompt else 0
-                is_match = result.score >= border
-                expected = bool(test_case.expected_output)
+                # actual_output is now a string "true"/"false"
+                actual_bool = test_case.actual_output == "true"
+                expected_bool = test_case.expected_output == "true"
 
-                self.score = 1.0 if is_match == expected else 0.0
+                self.score = 1.0 if actual_bool == expected_bool else 0.0
                 self.reason = (
-                    "match" if self.score else f"exp={expected}, got={is_match}"
+                    "match" if self.score else f"exp={expected_bool}, got={actual_bool}"
                 )
                 self.success = self.score >= self.threshold
                 return self.score
@@ -99,6 +107,7 @@ async def run_deepeval(
                 raise
 
         async def a_measure(self, test_case: LLMTestCase) -> float:  # noqa: D401
+            # For consistency, we'll just call measure since it doesn't need async operations
             return self.measure(test_case)
 
         def is_successful(self) -> bool:  # noqa: D401
@@ -111,7 +120,7 @@ async def run_deepeval(
     metric = BoolAccuracyMetric(prompt)
     if evaluate is None:  # pragma: no cover - optional dependency
         raise RuntimeError("deepeval is required to run evaluations")
-    results = await evaluate(test_cases, metrics=[metric])
+    results = evaluate(test_cases, metrics=[metric])
     # Extract accuracy from the results
     if hasattr(results, "test_results") and results.test_results:
         # Calculate accuracy as the ratio of successful tests
