@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-import src.run_deepeval as rd
 import src.evals as evals
 import src.prompts as prompts
+import src.run_deepeval as rd
 
 
 @pytest.mark.asyncio
@@ -42,20 +42,18 @@ async def test_run_deepeval(tmp_path, monkeypatch):
     monkeypatch.setattr(prompts, "match_prompt", fake_match_prompt)
 
     class DummyTC:
-        def __init__(self, input, expected_output):
+        def __init__(self, input, actual_output, expected_output):
             self.input = input
+            self.actual_output = actual_output
             self.expected_output = expected_output
-            self.actual_output = None
 
-    def fake_evaluate(test_cases, metrics):
-        correct = sum(
-            1
-            for tc in test_cases
-            if str(tc.expected_output).lower()
-            == str(tc.actual_output).lower()
-        )
-        acc = correct / len(test_cases)
-        return SimpleNamespace(aggregate_scores={"bool_accuracy": acc})
+    async def fake_evaluate(test_cases, metrics):
+        metric = metrics[0]
+        results = []
+        for tc in test_cases:
+            await metric.a_measure(tc)
+            results.append(SimpleNamespace(success=metric.success))
+        return SimpleNamespace(test_results=results)
 
     class DummyBaseMetric:
         def __init__(self, name=None):
@@ -65,7 +63,5 @@ async def test_run_deepeval(tmp_path, monkeypatch):
     monkeypatch.setattr(rd, "evaluate", fake_evaluate)
     monkeypatch.setattr(rd, "BaseMetric", DummyBaseMetric)
 
-    acc = await rd.run_deepeval(
-        "Inst", "Prompt", "suf", config_path=str(cfg_path)
-    )
+    acc = await rd.run_deepeval("Inst", "Prompt", "suf", config_path=str(cfg_path))
     assert acc == 1.0

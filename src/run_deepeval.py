@@ -57,39 +57,40 @@ async def run_deepeval(
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
-                actual_output=str(True).lower(),
-                # actual_output=await prompts.match_prompt(prompt, row["input"])["score"] >= (prompt.threshold or 0),
-                expected_output=str(row["expected"]["is_match"]).lower(),
+                actual_output=prompts.match_prompt(prompt, row["input"]),
+                expected_output=row["expected"]["is_match"],
             )
         )
 
     class BoolAccuracyMetric(BaseMetric):
-        def __init__(self) -> None:
+        def __init__(self, prompt: prompts.Prompt) -> None:
             self.name = "bool_accuracy"
             self.score = 0.0
             self.reason = ""
             self.success = False
             self.threshold = 0.5
-            self.async_mode = False
+            self.async_mode = True
+            self._prompt = prompt
 
-        def measure(self, test_case) -> float:  # type: ignore[override]
-            exp = str(test_case.expected_output).lower()
-            act = str(getattr(test_case, "actual_output", "")).lower()
-            self.score = 1.0 if exp == act else 0.0
-            self.reason = "match" if self.score else f"exp={exp}, got={act}"
+        async def a_measure(self, test_case) -> float:  # type: ignore[override]
+            result = await test_case.actual_output
+            is_match = result.score >= (self._prompt.threshold or 0)
+            exp = bool(test_case.expected_output)
+            self.score = 1.0 if is_match == exp else 0.0
+            self.reason = "match" if self.score else f"exp={exp}, got={is_match}"
             self.success = self.score >= self.threshold
             return float(self.score)
 
-        async def a_measure(self, test_case) -> float:  # type: ignore[override]
-            return self.measure(test_case)
+        def measure(self, test_case) -> float:  # type: ignore[override]
+            raise NotImplementedError("Synchronous measure is not supported")
 
         def is_successful(self) -> bool:
             return self.success
 
-    metric = BoolAccuracyMetric()
+    metric = BoolAccuracyMetric(prompt)
     if evaluate is None:  # pragma: no cover - optional dependency
         raise RuntimeError("deepeval is required to run evaluations")
-    results = evaluate(test_cases, metrics=[metric])
+    results = await evaluate(test_cases, metrics=[metric])
     # Extract accuracy from the results
     if hasattr(results, "test_results") and results.test_results:
         # Calculate accuracy as the ratio of successful tests
