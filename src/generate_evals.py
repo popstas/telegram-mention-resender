@@ -2,20 +2,22 @@ import argparse
 import asyncio
 import json
 import os
-from pathlib import Path
 from typing import Iterable
 
 from telethon import TelegramClient
 
 from .config import get_api_credentials, load_config, load_instances
+from .evals import get_eval_path
 from .telegram_utils import get_safe_name
 
 
 async def _fetch_texts(client: TelegramClient, entity) -> Iterable[str]:
     """Yield text of all messages from ``entity``."""
     async for msg in client.iter_messages(entity):
-        text = getattr(msg, "message", None) or getattr(msg, "text", None) or getattr(
-            msg, "raw_text", None
+        text = (
+            getattr(msg, "message", None)
+            or getattr(msg, "text", None)
+            or getattr(msg, "raw_text", None)
         )
         if text:
             yield text
@@ -34,10 +36,11 @@ async def generate_evals(suffix: str) -> None:
         if not inst.true_positive_entity or not inst.false_positive_entity:
             continue
         for prompt in inst.prompts:
+            base = get_eval_path(inst.name, prompt.name or "prompt", suffix)
+            base.mkdir(parents=True, exist_ok=True)
+
             inst_name = get_safe_name(inst.name)
             prompt_name = get_safe_name(prompt.name or "prompt")
-            base = Path("data") / "evals" / f"{inst_name}_{prompt_name}_{suffix}"
-            base.mkdir(parents=True, exist_ok=True)
 
             msg_path = base / "messages.jsonl"
             with msg_path.open("w", encoding="utf-8") as fh:

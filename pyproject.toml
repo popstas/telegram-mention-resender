@@ -26,6 +26,7 @@ dependencies = [
     "PyYAML",
     "openai",
     "langfuse",
+    "deepeval",
 ]
 
 [project.optional-dependencies]
