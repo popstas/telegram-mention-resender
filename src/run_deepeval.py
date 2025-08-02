@@ -3,7 +3,7 @@ import asyncio
 import json
 import os
 
-from . import prompts
+from . import langfuse_utils, prompts
 from .config import load_config, load_instances
 from .evals import get_eval_path
 
@@ -36,6 +36,9 @@ async def run_deepeval(
 
     config = load_config()
     prompts.config.update(config)
+    global langfuse
+    langfuse = langfuse_utils.init_langfuse(config)
+    prompts.langfuse = langfuse
     instances = await load_instances(config)
 
     inst = next((i for i in instances if i.name == instance), None)
@@ -57,35 +60,53 @@ async def run_deepeval(
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
-                actual_output=prompts.match_prompt(prompt, row["input"]),
+                actual_output=await prompts.match_prompt(prompt, row["input"]),
                 expected_output=row["expected"]["is_match"],
             )
         )
 
     class BoolAccuracyMetric(BaseMetric):
-        def __init__(self, prompt: prompts.Prompt) -> None:
-            self.name = "bool_accuracy"
-            self.score = 0.0
-            self.reason = ""
-            self.success = False
-            self.threshold = 0.5
+        """Проверяет, совпадает ли булев verdict модели с эталоном."""
+
+        def __init__(self, prompt=None, *, threshold: float = 0.5):
+            self.threshold = threshold  # обязателен
+            self.include_reason = True
             self.async_mode = True
             self._prompt = prompt
 
-        async def a_measure(self, test_case) -> float:  # type: ignore[override]
-            result = await test_case.actual_output
-            is_match = result.score >= (self._prompt.threshold or 0)
-            exp = bool(test_case.expected_output)
-            self.score = 1.0 if is_match == exp else 0.0
-            self.reason = "match" if self.score else f"exp={exp}, got={is_match}"
-            self.success = self.score >= self.threshold
-            return float(self.score)
+            # будут заполнены позже
+            self.score = 0.0
+            self.reason = ""
+            self.success = False
+            self.error = None
 
-        def measure(self, test_case) -> float:  # type: ignore[override]
-            raise NotImplementedError("Synchronous measure is not supported")
+        def measure(self, test_case: LLMTestCase) -> float:
+            try:
+                result = test_case.actual_output  # объект с .score
+                border = (self._prompt.threshold or 0) if self._prompt else 0
+                is_match = result.score >= border
+                expected = bool(test_case.expected_output)
 
-        def is_successful(self) -> bool:
-            return self.success
+                self.score = 1.0 if is_match == expected else 0.0
+                self.reason = (
+                    "match" if self.score else f"exp={expected}, got={is_match}"
+                )
+                self.success = self.score >= self.threshold
+                return self.score
+            except Exception as exc:
+                self.error = str(exc)
+                self.success = False
+                raise
+
+        async def a_measure(self, test_case: LLMTestCase) -> float:  # noqa: D401
+            return self.measure(test_case)
+
+        def is_successful(self) -> bool:  # noqa: D401
+            return self.success and self.error is None
+
+        @property
+        def __name__(self) -> str:  # noqa: D401
+            return "Boolean Accuracy"
 
     metric = BoolAccuracyMetric(prompt)
     if evaluate is None:  # pragma: no cover - optional dependency
