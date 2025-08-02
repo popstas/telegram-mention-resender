@@ -117,9 +117,17 @@ async def load_langfuse_prompt(prompt: Prompt):
 class EvaluateResult(BaseModel):
     """Result returned by LLM evaluation."""
 
-    reasoning: Annotated[str, Field(max_length=100)] = ""
-    quote: Annotated[str, Field(max_length=100)] = ""
-    score: Annotated[int, Field(ge=0, le=5)] = 0
+    reasoning: Annotated[
+        str, Field(max_length=100, description="Краткое объяснение без цитат, RU")
+    ] = ""
+    quote: Annotated[
+        str,
+        Field(
+            max_length=100,
+            description="Оригинальный фрагмент сообщения, демонстрирующий максимум недовольства",
+        ),
+    ] = ""
+    score: Annotated[int, Field(ge=0, le=5, description="Уровень")] = 0
 
 
 @observe()
