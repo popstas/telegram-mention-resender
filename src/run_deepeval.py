@@ -3,7 +3,7 @@ import asyncio
 import json
 import os
 
-from . import prompts
+from . import langfuse_utils, prompts
 from .config import load_config, load_instances
 from .evals import get_eval_path
 
@@ -15,6 +15,12 @@ except Exception:  # pragma: no cover - optional dependency
     evaluate = None
     LLMTestCase = object  # type: ignore
     BaseMetric = object  # type: ignore
+
+
+async def run_prompt_match(prompt, text: str, threshold: int = 4) -> str:
+    """Run prompt match and return "true" or "false" based on score >= threshold."""
+    result = await prompts.match_prompt(prompt, text)
+    return "true" if result.score >= threshold else "false"
 
 
 async def run_deepeval(
@@ -36,6 +42,9 @@ async def run_deepeval(
 
     config = load_config()
     prompts.config.update(config)
+    global langfuse
+    langfuse = langfuse_utils.init_langfuse(config)
+    prompts.langfuse = langfuse
     instances = await load_instances(config)
 
     inst = next((i for i in instances if i.name == instance), None)
@@ -54,39 +63,61 @@ async def run_deepeval(
     test_cases = []
     for line in msg_path.read_text(encoding="utf-8").splitlines():
         row = json.loads(line)
+
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
-                actual_output=str(True).lower(),
-                # actual_output=await prompts.match_prompt(prompt, row["input"])["score"] >= (prompt.threshold or 0),
+                actual_output=await run_prompt_match(
+                    prompt, row["input"], prompt.threshold
+                ),
                 expected_output=str(row["expected"]["is_match"]).lower(),
             )
         )
 
     class BoolAccuracyMetric(BaseMetric):
-        def __init__(self) -> None:
-            self.name = "bool_accuracy"
+        """Проверяет, совпадает ли булев verdict модели с эталоном."""
+
+        def __init__(self, prompt=None, *, threshold: float = 0.5):
+            self.threshold = threshold  # обязателен
+            self.include_reason = True
+            self.async_mode = True
+            self._prompt = prompt
+
+            # будут заполнены позже
             self.score = 0.0
             self.reason = ""
             self.success = False
-            self.threshold = 0.5
-            self.async_mode = False
+            self.error = None
 
-        def measure(self, test_case) -> float:  # type: ignore[override]
-            exp = str(test_case.expected_output).lower()
-            act = str(getattr(test_case, "actual_output", "")).lower()
-            self.score = 1.0 if exp == act else 0.0
-            self.reason = "match" if self.score else f"exp={exp}, got={act}"
-            self.success = self.score >= self.threshold
-            return float(self.score)
+        def measure(self, test_case: LLMTestCase) -> float:
+            try:
+                # actual_output is now a string "true"/"false"
+                actual_bool = test_case.actual_output == "true"
+                expected_bool = test_case.expected_output == "true"
 
-        async def a_measure(self, test_case) -> float:  # type: ignore[override]
+                self.score = 1.0 if actual_bool == expected_bool else 0.0
+                self.reason = (
+                    "match" if self.score else f"exp={expected_bool}, got={actual_bool}"
+                )
+                self.success = self.score >= self.threshold
+                return self.score
+            except Exception as exc:
+                self.error = str(exc)
+                self.success = False
+                raise
+
+        async def a_measure(self, test_case: LLMTestCase) -> float:  # noqa: D401
+            # For consistency, we'll just call measure since it doesn't need async operations
             return self.measure(test_case)
 
-        def is_successful(self) -> bool:
-            return self.success
+        def is_successful(self) -> bool:  # noqa: D401
+            return self.success and self.error is None
 
-    metric = BoolAccuracyMetric()
+        @property
+        def __name__(self) -> str:  # noqa: D401
+            return "Boolean Accuracy"
+
+    metric = BoolAccuracyMetric(prompt)
     if evaluate is None:  # pragma: no cover - optional dependency
         raise RuntimeError("deepeval is required to run evaluations")
     results = evaluate(test_cases, metrics=[metric])
