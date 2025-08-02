@@ -52,6 +52,17 @@ Statistics about processed messages are stored in `data/stats.json`. If you
 have a file in the old format (without the `stats` section), it will be
 automatically converted on startup using the new `Stats` structure.
 
+## Generate evaluation datasets
+
+Build evaluation tasks from collected true and false positive messages:
+
+```bash
+python -m src.generate_evals --suffix run1
+```
+
+Datasets and configuration files will be written to `data/evals/` with the
+provided suffix.
+
 ### Langfuse tracing
 
 Set `langfuse_public_key` and `langfuse_secret_key` in the config to enable
