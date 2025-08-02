@@ -1,0 +1,110 @@
+import argparse
+import asyncio
+import json
+import os
+from pathlib import Path
+from typing import Iterable
+
+from telethon import TelegramClient
+
+from .config import get_api_credentials, load_config, load_instances
+from .telegram_utils import get_safe_name
+
+
+async def _fetch_texts(client: TelegramClient, entity) -> Iterable[str]:
+    """Yield text of all messages from ``entity``."""
+    async for msg in client.iter_messages(entity):
+        text = getattr(msg, "message", None) or getattr(msg, "text", None) or getattr(
+            msg, "raw_text", None
+        )
+        if text:
+            yield text
+
+
+async def generate_evals(suffix: str) -> None:
+    """Generate evaluation datasets from true/false positive entities."""
+    config = load_config()
+    api_id, api_hash, session = get_api_credentials(config)
+    client = TelegramClient(session, api_id, api_hash)
+    await client.start()
+
+    instances = await load_instances(config)
+
+    for inst in instances:
+        if not inst.true_positive_entity or not inst.false_positive_entity:
+            continue
+        for prompt in inst.prompts:
+            inst_name = get_safe_name(inst.name)
+            prompt_name = get_safe_name(prompt.name or "prompt")
+            base = Path("data") / "evals" / f"{inst_name}_{prompt_name}_{suffix}"
+            base.mkdir(parents=True, exist_ok=True)
+
+            msg_path = base / "messages.jsonl"
+            with msg_path.open("w", encoding="utf-8") as fh:
+                async for text in _fetch_texts(client, inst.true_positive_entity):
+                    fh.write(
+                        json.dumps(
+                            {"input": text, "expected": {"is_match": True}},
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+                async for text in _fetch_texts(client, inst.false_positive_entity):
+                    fh.write(
+                        json.dumps(
+                            {"input": text, "expected": {"is_match": False}},
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+
+            model = (prompt.config or {}).get("model", "gpt-4.1")
+            temperature = (prompt.config or {}).get("temperature", 0.2)
+            task_yml = f"""eval_name: {inst_name}_{prompt_name}
+dataset: ./messages.jsonl
+
+model: {model}
+modelParameters:
+  temperature: {temperature}
+  response_format: {{ type: json_schema }}
+messages:
+  - role: system
+    content: |
+      {prompt.prompt or ''}
+  - role: user
+    content: |
+      {{input}}
+
+task: llm-rubric
+rubric: |
+  import json
+  def grade(resp, expected):
+      score = json.loads(resp)["score"]
+      pred  = score >= {prompt.threshold}
+      return {{"accuracy": int(pred == expected["is_match"])}}
+metrics: [accuracy]
+"""
+            (base / "task.yml").write_text(task_yml, encoding="utf-8")
+
+            readme = f"""# Evaluation for {inst.name} - {prompt.name}
+
+To run this evaluation:
+
+```bash
+openai evals run ./task.yml
+```
+"""
+            (base / "README.md").write_text(readme, encoding="utf-8")
+
+    await client.disconnect()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate evaluation datasets")
+    parser.add_argument("--suffix", required=True, help="Folder suffix")
+    args = parser.parse_args()
+    asyncio.run(generate_evals(args.suffix))
+
+
+if __name__ == "__main__":
+    main()

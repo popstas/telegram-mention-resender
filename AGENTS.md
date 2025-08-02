@@ -19,6 +19,7 @@ This project forwards Telegram messages that match specific rules to a target ch
 │   ├── prompts.py        # OpenAI prompts
 │   ├── stats.py          # stats tracking
 │   ├── telegram_utils.py # Telegram helpers
+│   ├── generate_evals.py # build eval datasets
 │   └── __init__.py       # marks package
 ├── tests/                # pytest suite
 ├── README.md             # setup instructions
