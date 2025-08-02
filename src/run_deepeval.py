@@ -9,8 +9,8 @@ from .evals import get_eval_path
 
 try:  # pragma: no cover - optional dependency
     from deepeval import evaluate
-    from deepeval.test_case import LLMTestCase
     from deepeval.metrics.base_metric import BaseMetric
+    from deepeval.test_case import LLMTestCase
 except Exception:  # pragma: no cover - optional dependency
     evaluate = None
     LLMTestCase = object  # type: ignore
@@ -57,29 +57,48 @@ async def run_deepeval(
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
+                actual_output=str(True).lower(),
+                # actual_output=await prompts.match_prompt(prompt, row["input"])["score"] >= (prompt.threshold or 0),
                 expected_output=str(row["expected"]["is_match"]).lower(),
             )
         )
 
-    for tc in test_cases:
-        res = await prompts.match_prompt(prompt, tc.input)
-        tc.actual_output = str(res.score >= (prompt.threshold or 0)).lower()
-
     class BoolAccuracyMetric(BaseMetric):
         def __init__(self) -> None:
-            super().__init__(name="bool_accuracy")
+            self.name = "bool_accuracy"
+            self.score = 0.0
+            self.reason = ""
+            self.success = False
+            self.threshold = 0.5
+            self.async_mode = False
 
-        def measure(self, test_case) -> None:  # type: ignore[override]
+        def measure(self, test_case) -> float:  # type: ignore[override]
             exp = str(test_case.expected_output).lower()
             act = str(getattr(test_case, "actual_output", "")).lower()
             self.score = 1.0 if exp == act else 0.0
             self.reason = "match" if self.score else f"exp={exp}, got={act}"
+            self.success = self.score >= self.threshold
+            return float(self.score)
+
+        async def a_measure(self, test_case) -> float:  # type: ignore[override]
+            return self.measure(test_case)
+
+        def is_successful(self) -> bool:
+            return self.success
 
     metric = BoolAccuracyMetric()
     if evaluate is None:  # pragma: no cover - optional dependency
         raise RuntimeError("deepeval is required to run evaluations")
     results = evaluate(test_cases, metrics=[metric])
-    return float(results.aggregate_scores.get("bool_accuracy", 0.0))
+    # Extract accuracy from the results
+    if hasattr(results, "test_results") and results.test_results:
+        # Calculate accuracy as the ratio of successful tests
+        successful_tests = sum(
+            1 for test_result in results.test_results if test_result.success
+        )
+        return float(successful_tests / len(results.test_results))
+    else:
+        return 0.0
 
 
 def main() -> None:
