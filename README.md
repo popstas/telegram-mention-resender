@@ -63,6 +63,16 @@ python -m src.generate_evals --suffix run1
 Datasets and configuration files will be written to `data/evals/` with the
 provided suffix.
 
+## Run evaluations
+
+After generating datasets, run them with [DeepEval](https://github.com/confident-ai/deepeval):
+
+```bash
+python -m src.run_deepeval --instance "Inst" --prompt "Prompt" --suffix run1
+```
+
+Use `--config` to provide a custom path to `config.yml` if needed.
+
 ### Langfuse tracing
 
 Set `langfuse_public_key` and `langfuse_secret_key` in the config to enable

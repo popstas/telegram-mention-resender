@@ -24,3 +24,14 @@ def test_get_api_credentials_success():
 def test_get_api_credentials_missing():
     with pytest.raises(RuntimeError):
         config.get_api_credentials({})
+
+
+def test_config_path_env_override(tmp_path, monkeypatch):
+    cfg = tmp_path / "env.yml"
+    cfg.write_text("bar: 2")
+    monkeypatch.setenv("CONFIG_PATH", str(cfg))
+    import importlib
+
+    cfg_module = importlib.reload(config)
+    assert cfg_module.CONFIG_PATH == str(cfg)
+    assert cfg_module.load_config() == {"bar": 2}

@@ -6,7 +6,8 @@ import yaml
 
 from .prompts import Prompt
 
-CONFIG_PATH = os.path.join("data", "config.yml")
+# Allow overriding config path via environment variable
+CONFIG_PATH = os.environ.get("CONFIG_PATH", os.path.join("data", "config.yml"))
 
 
 @dataclass

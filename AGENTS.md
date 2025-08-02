@@ -17,6 +17,8 @@ This project forwards Telegram messages that match specific rules to a target ch
 │   ├── main.py           # CLI entry point
 │   ├── config.py         # config helpers
 │   ├── prompts.py        # OpenAI prompts
+│   ├── evals.py          # evaluation helpers
+│   ├── run_deepeval.py   # run eval datasets
 │   ├── stats.py          # stats tracking
 │   ├── telegram_utils.py # Telegram helpers
 │   ├── generate_evals.py # build eval datasets

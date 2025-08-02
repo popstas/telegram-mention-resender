@@ -1,4 +1,3 @@
-import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-import src.generate_evals as ge
 import src.config as config_module
+import src.generate_evals as ge
 
 
 class DummyMessage:
