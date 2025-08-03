@@ -50,7 +50,7 @@ def test_run_openai_evals(tmp_path, monkeypatch):
                         "name": "Prompt",
                         "prompt": "p",
                         "threshold": 3,
-                        "config": {"temperature": 0.3},
+                        "config": {"temperature": 0.3, "model": "gpt-4.1"},
                     },
                 ],
             }
@@ -70,12 +70,20 @@ def test_run_openai_evals(tmp_path, monkeypatch):
     url = roe.run_openai_evals("Inst", "Prompt", "suf", config_path=str(cfg_path))
     assert url == "url"
     assert dummy.evals.created["name"] == "Inst_Prompt"
-    assert "score=json.loads" in dummy.evals.created["testing_criteria"][0]["code"]
+    assert (
+        "def grade(sample, item):"
+        in dummy.evals.created["testing_criteria"][0]["source"]
+    )
     eval_id, run_kwargs = dummy.evals.run_args
     assert eval_id == "eval-1"
     ds = run_kwargs["data_source"]
-    assert ds["source"]["id"] == "file-1"
+    assert ds["model"] == "gpt-4.1"
+    assert ds["sampling_params"]["temperature"] == 0.3
+    assert (
+        ds["sampling_params"]["response_format"]["json_schema"]["name"]
+        == "EvaluateResult"
+    )
     tmpl = ds["input_messages"]["template"]
     assert tmpl[0]["role"] == "system"
-    assert ds["sampling_params"] == {"temperature": 0.3}
-    assert ds["response_format"]["json_schema"]["name"] == "EvaluateResult"
+    assert "file_content" in ds["source"]["type"]
+    assert len(ds["source"]["content"]) == 1
