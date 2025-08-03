@@ -17,10 +17,9 @@ except Exception:  # pragma: no cover - optional dependency
     BaseMetric = object  # type: ignore
 
 
-async def run_prompt_match(prompt, text: str, threshold: int = 4) -> str:
-    """Run prompt match and return "true" or "false" based on score >= threshold."""
-    result = await prompts.match_prompt(prompt, text)
-    return "true" if result.score >= threshold else "false"
+async def run_prompt_match(prompt, text: str):
+    """Run prompt match and return raw :class:`EvaluateResult`."""
+    return await prompts.match_prompt(prompt, text)
 
 
 async def run_deepeval(
@@ -64,13 +63,16 @@ async def run_deepeval(
     for line in msg_path.read_text(encoding="utf-8").splitlines():
         row = json.loads(line)
 
+        res = await run_prompt_match(prompt, row["input"])
         test_cases.append(
             LLMTestCase(
                 input=row["input"],
-                actual_output=await run_prompt_match(
-                    prompt, row["input"], prompt.threshold
-                ),
+                actual_output=("true" if res.score >= prompt.threshold else "false"),
                 expected_output=str(row["expected"]["is_match"]).lower(),
+                comments=res.reasoning or None,
+                context=[res.quote] if res.quote else None,
+                token_cost=getattr(res, "token_cost", None),
+                completion_time=getattr(res, "completion_time", None),
             )
         )
 
@@ -148,6 +150,8 @@ def main() -> None:
         )
     )
     print(f"Accuracy: {accuracy:.2%}")
+    if accuracy < 0.8:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
