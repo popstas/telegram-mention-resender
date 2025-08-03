@@ -120,9 +120,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             for p in inst.prompts:
                 res = await match_prompt(p, message.raw_text, inst.name, chat_name)
                 sc = res.score
-                trace_id = (
-                    langfuse.get_current_trace_id() if langfuse is not None else None
-                )
+                trace_id = res.trace_id
                 if sc > used_score:
                     used_score = sc
                     used_prompt = p
