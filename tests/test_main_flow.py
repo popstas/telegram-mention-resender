@@ -111,9 +111,13 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_pa
     assert dummy_client.sent[1][0][0] == "name"
     data = json.loads(stats_path.read_text())
     assert data["stats"]["total"] == 1
+    assert data["stats"]["forwarded_total"] == 1
+    assert data["stats"]["forwarded_words"] == 1
     inst = data["instances"][0]
     assert inst["name"] == "i"
     assert inst["stats"]["total"] == 1
+    assert inst["stats"]["forwarded_total"] == 1
+    assert inst["stats"]["forwarded_words"] == 1
 
 
 @pytest.mark.asyncio
@@ -160,6 +164,11 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
 
     assert sent[0][0][0] == 1
     assert msg.forwarded == [1]
+    assert app.stats.data["stats"]["forwarded_total"] == 1
+    assert app.stats.data["stats"]["forwarded_prompt"] == 1
+    inst_data = app.stats.data["instances"][0]
+    assert inst_data["stats"]["forwarded_total"] == 1
+    assert inst_data["stats"]["forwarded_prompt"] == 1
 
 
 @pytest.mark.asyncio
