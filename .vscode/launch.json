@@ -27,6 +27,14 @@
             "program": "-m",
             "args": ["src.run_deepeval", "--config", "data/data/config.yml", "--instance", "Агентства", "--prompt", "Недовольство", "--suffix", "main"],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "run_openai_evals --config data/data/config.yml --instance Агентства --prompt Недовольство --suffix main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            "args": ["src.run_openai_evals", "--config", "data/data/config.yml", "--instance", "Агентства", "--prompt", "Недовольство", "--suffix", "main"],
+            "console": "integratedTerminal"
         }
     ]
 }

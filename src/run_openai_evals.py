@@ -39,62 +39,76 @@ def run_openai_evals(
     if prompt is None:
         raise ValueError(f"Prompt '{prompt_name}' not found in instance '{instance}'")
 
-    base = get_eval_path(inst.name, prompt.name or "prompt", suffix)
-    data_path = base / "messages.jsonl"
-    if not data_path.exists():
-        raise FileNotFoundError(data_path)
-
     client = OpenAI(api_key=config.get("openai_api_key"))
 
-    with data_path.open("rb") as fh:
-        uploaded = client.files.create(file=fh, purpose="evals")
-
     eval_name = f"{get_safe_name(inst.name)}_{get_safe_name(prompt.name or 'prompt')}"
+
+    item_schema = {
+        "type": "object",
+        "properties": {
+            "input": {"type": "string"},
+            "expected": {
+                "type": "object",
+                "properties": {"is_match": {"type": "boolean"}},
+                "required": ["is_match"],
+            },
+        },
+        "required": ["input", "expected"],
+    }
+
+    testing_criteria = [
+        {
+            "type": "python",
+            "name": "Threshold Accuracy",
+            "pass_threshold": 1.0,
+            "source": f'''
+def grade(sample, item):
+    """
+    sample: вывод модели; см. sample["output_json"] или sample["output_text"]
+    item:   элемент датасета, где item["expected"]["is_match"] — эталон
+    """
+    import json
+
+    # 1. Достаём score
+    if sample.get("output_json"):
+        score = sample["output_json"]["score"]
+    else:
+        score = json.loads(sample["output_text"])["score"]
+
+    # 2. Сравниваем с порогом
+    pred = score >= {prompt.threshold}
+
+    # 3. Возвращаем 1.0, если предсказание совпало с эталоном
+    # return sample
+    return 1.0 if pred == item["expected"]["is_match"] else 0.0
+'''.lstrip(),
+        }
+    ]
 
     eval_obj = client.evals.create(
         name=eval_name,
         data_source_config={
             "type": "custom",
-            "item_schema": {
-                "type": "object",
-                "properties": {
-                    "input": {"type": "string"},
-                    "expected": {
-                        "type": "object",
-                        "properties": {"is_match": {"type": "boolean"}},
-                        "required": ["is_match"],
-                    },
-                },
-                "required": ["input", "expected"],
-            },
+            "item_schema": item_schema,
             "include_sample_schema": True,
         },
-        testing_criteria=[
-            {
-                "type": "python",
-                "name": "Threshold Accuracy",
-                "input": "{{ sample.output_text }}",
-                "reference": "{{ item.expected.is_match }}",
-                "code": (
-                    "import json\n"
-                    "score=json.loads(input)['score']\n"
-                    f"pred=score>={prompt.threshold}\n"
-                    "return int(pred==reference)"
-                ),
-            }
-        ],
+        testing_criteria=testing_criteria,
     )
 
-    ds = {
-        "type": "completions",
-        "model": (prompt.config or {}).get("model", "gpt-4.1"),
-        "input_messages": {
-            "type": "template",
-            "template": [
-                {"role": "system", "content": prompt.prompt or ""},
-                {"role": "user", "content": "{{ item.input }}"},
-            ],
-        },
+    # dataset
+    base = get_eval_path(inst.name, prompt.name or "prompt", suffix)
+    data_path = base / "messages.jsonl"
+    if not data_path.exists():
+        raise FileNotFoundError(data_path)
+    # with data_path.open("rb") as fh:
+    #     uploaded = client.files.create(file=fh, purpose="evals")
+    with data_path.open("rb") as fh:
+        rows = [json.loads(line) for line in fh]
+
+    model = (prompt.config or {}).get("model", "gpt-4.1")
+    temperature = (prompt.config or {}).get("temperature", 1)
+
+    sampling_params = {
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -102,15 +116,36 @@ def run_openai_evals(
                 "schema": EvaluateResult.model_json_schema(),
             },
         },
-        "source": {"type": "file_id", "id": uploaded.id},
+        "temperature": temperature,
     }
-    temperature = (prompt.config or {}).get("temperature")
-    if temperature is not None:
-        ds["sampling_params"] = {"temperature": temperature}
+
+    data_source = {
+        "type": "completions",
+        "model": model,
+        "input_messages": {
+            "type": "template",
+            "template": [
+                {"role": "system", "content": prompt.prompt or ""},
+                {"role": "user", "content": "{{ item.input }}"},
+            ],
+        },
+        "sampling_params": sampling_params,
+        # "source": {"type": "file_id", "id": uploaded.id},
+        "source": {
+            "type": "file_content",
+            "content": [{"item": row} for row in rows],
+        },
+    }
+
+    run_name_parts = [
+        model,
+        f"temp {temperature}",
+    ]
+
     run = client.evals.runs.create(
         eval_obj.id,
-        name=f"{eval_name} run",
-        data_source=ds,
+        name=", ".join(run_name_parts),
+        data_source=data_source,
     )
 
     return getattr(run, "report_url", "")
