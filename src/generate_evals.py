@@ -94,7 +94,7 @@ metrics: [accuracy]
 To run this evaluation:
 
 ```bash
-openai evals run ./task.yml
+python -m src.run_openai_evals --instance \"{inst.name}\" --prompt \"{prompt.name}\" --suffix {suffix}
 ```
 """
             (base / "README.md").write_text(readme, encoding="utf-8")
