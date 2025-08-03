@@ -78,3 +78,8 @@ async def test_generate_evals(tmp_path, monkeypatch):
     task = (base / "task.yml").read_text(encoding="utf-8")
     assert "eval_name: Inst_Prompt" in task
     assert "score >= 3" in task
+    readme = (base / "README.md").read_text(encoding="utf-8")
+    assert (
+        'python -m src.run_openai_evals --instance "Inst" --prompt "Prompt" --suffix suf'
+        in readme
+    )

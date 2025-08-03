@@ -74,6 +74,15 @@ python -m src.run_deepeval --instance "Inst" --prompt "Prompt" --suffix run1
 Use `--config` to provide a custom path to `config.yml` if needed.
 The command exits with status code `1` if accuracy is below 80%.
 
+To evaluate using OpenAI's Evals API:
+
+```bash
+python -m src.run_openai_evals --instance "Inst" --prompt "Prompt" --suffix run1
+```
+
+The runner respects any `model` or `temperature` options defined in the prompt
+configuration and forces JSON responses that match the `EvaluateResult` schema.
+
 ### Langfuse tracing
 
 Set `langfuse_public_key` and `langfuse_secret_key` in the config to enable
