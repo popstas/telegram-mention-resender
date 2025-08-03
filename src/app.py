@@ -19,6 +19,7 @@ from .telegram_utils import (
     resolve_entities,
     word_in_text,
 )
+from .trace_ids import trace_ids
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
     used_score = 0
     used_quote: str | None = None
     used_reasoning: str | None = None
+    used_trace_id: str | None = None
 
     if message.raw_text:
         w = find_word(inst.words, message.raw_text)
@@ -118,11 +120,15 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             for p in inst.prompts:
                 res = await match_prompt(p, message.raw_text, inst.name, chat_name)
                 sc = res.score
+                trace_id = (
+                    langfuse.get_current_trace_id() if langfuse is not None else None
+                )
                 if sc > used_score:
                     used_score = sc
                     used_prompt = p
                     used_quote = res.quote
                     used_reasoning = res.reasoning
+                    used_trace_id = trace_id
                 if sc >= (p.threshold or 4):
                     forward = True
                     break
@@ -149,6 +155,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                 if not inst.no_forward_message:
                     await client.send_message(dest, text)
                 forwarded = await message.forward_to(dest)
+                if forwarded and used_trace_id:
+                    trace_ids.set(forwarded.id, used_trace_id)
                 f_url = get_message_url(forwarded) if forwarded else None
                 logger.info(
                     "Forwarded message %s from %s to %s for %s (target url: %s)",
@@ -215,7 +223,10 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         message = await client.get_messages(update.peer, ids=update.msg_id)
         if not message:
             return
+        trace_id = trace_ids.get(message.id)
         forwarded = await message.forward_to(dest)
+        if forwarded and trace_id:
+            trace_ids.set(forwarded.id, trace_id)
         if positive:
             forwarded_positive.add(key)
         elif negative:
