@@ -208,7 +208,9 @@ async def test_match_prompt_no_api(monkeypatch):
     prompts.config["openai_api_key"] = ""
     prompt = prompts.Prompt(name="n", prompt="hello")
     result = await prompts.match_prompt(prompt, "msg")
-    assert result == prompts.EvaluateResult(score=0, reasoning="", quote="")
+    assert result == prompts.MatchPromptResult(
+        score=0, reasoning="", quote="", trace_id=None
+    )
 
 
 def test_get_forward_reason_text_word():

@@ -10,8 +10,9 @@ from src.trace_ids import trace_ids
 
 
 class DummyMessage:
-    def __init__(self, msg_id: int, text: str):
+    def __init__(self, msg_id: int, text: str, chat_id: int):
         self.id = msg_id
+        self.chat_id = chat_id
         self.text = text
         self.message = text
         self.raw_text = text
@@ -63,11 +64,11 @@ async def test_generate_evals(tmp_path, monkeypatch):
     cfg_path.write_text(yaml.dump(cfg), encoding="utf-8")
 
     msgs = {
-        "pos": [DummyMessage(1, "p1"), DummyMessage(2, "p2")],
-        "neg": [DummyMessage(3, "n1")],
+        "pos": [DummyMessage(1, "p1", 100), DummyMessage(2, "p2", 100)],
+        "neg": [DummyMessage(3, "n1", 200)],
     }
     for m in msgs["pos"] + msgs["neg"]:
-        trace_ids.set(m.id, f"t{m.id}")
+        trace_ids.set(m.chat_id, m.id, f"t{m.id}")
     monkeypatch.setattr(ge, "TelegramClient", lambda *a, **k: DummyClient(msgs))
 
     await ge.generate_evals("suf")

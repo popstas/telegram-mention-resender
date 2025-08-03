@@ -10,31 +10,39 @@ TRACE_IDS_PATH = os.path.join("data", "trace_ids.json")
 
 
 class TraceStore:
-    """Store mapping from Telegram message IDs to Langfuse trace IDs."""
+    """Store mapping from Telegram chat/message IDs to Langfuse trace IDs."""
 
     def __init__(self, path: str, flush_interval: int = 60) -> None:
         self.path = path
         self.flush_interval = flush_interval
         self.last_flush = time.monotonic()
         self.dirty = False
-        self.data: dict[str, str] = {}
+        self.data: dict[str, dict[str, str]] = {}
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    self.data = json.load(f)
+                    loaded = json.load(f)
+                if loaded and all(isinstance(v, str) for v in loaded.values()):
+                    # backward compatibility with old format without chat ids
+                    self.data["0"] = loaded  # type: ignore[assignment]
+                else:
+                    self.data = loaded
             except Exception:  # pragma: no cover - corrupt file
                 self.data = {}
 
-    def set(self, message_id: int | str, trace_id: str | None) -> None:
+    def set(
+        self, chat_id: int | str, message_id: int | str, trace_id: str | None
+    ) -> None:
         if trace_id is None:
             return
-        self.data[str(message_id)] = trace_id
+        chat = self.data.setdefault(str(chat_id), {})
+        chat[str(message_id)] = trace_id
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()
 
-    def get(self, message_id: int | str) -> str | None:
-        return self.data.get(str(message_id))
+    def get(self, chat_id: int | str, message_id: int | str) -> str | None:
+        return self.data.get(str(chat_id), {}).get(str(message_id))
 
     def flush(self) -> None:
         if not self.dirty:

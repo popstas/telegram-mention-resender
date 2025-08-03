@@ -141,7 +141,7 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
         assert prompt.prompt == "hi"
         assert inst_name == "p"
         assert chat_name == "n"
-        return prompts.EvaluateResult(score=5, reasoning="", quote="")
+        return prompts.MatchPromptResult(score=5, reasoning="", quote="", trace_id=None)
 
     async def fake_get_message_source(msg):
         return "src"
