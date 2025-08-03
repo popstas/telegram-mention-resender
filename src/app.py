@@ -154,7 +154,7 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                     await client.send_message(dest, text)
                 forwarded = await message.forward_to(dest)
                 if forwarded and used_trace_id:
-                    trace_ids.set(forwarded.id, used_trace_id)
+                    trace_ids.set(forwarded.chat_id, forwarded.id, used_trace_id)
                 f_url = get_message_url(forwarded) if forwarded else None
                 logger.info(
                     "Forwarded message %s from %s to %s for %s (target url: %s)",
@@ -221,10 +221,10 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         message = await client.get_messages(update.peer, ids=update.msg_id)
         if not message:
             return
-        trace_id = trace_ids.get(message.id)
+        trace_id = trace_ids.get(peer_id, message.id)
         forwarded = await message.forward_to(dest)
         if forwarded and trace_id:
-            trace_ids.set(forwarded.id, trace_id)
+            trace_ids.set(forwarded.chat_id, forwarded.id, trace_id)
         if positive:
             forwarded_positive.add(key)
         elif negative:

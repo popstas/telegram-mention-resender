@@ -55,7 +55,7 @@ async def generate_evals(suffix: str) -> None:
                             {
                                 "input": text,
                                 "expected": {"is_match": True},
-                                "trace_id": trace_ids.get(msg.id),
+                                "trace_id": trace_ids.get(msg.chat_id, msg.id),
                             },
                             ensure_ascii=False,
                         )
@@ -72,7 +72,7 @@ async def generate_evals(suffix: str) -> None:
                             {
                                 "input": text,
                                 "expected": {"is_match": False},
-                                "trace_id": trace_ids.get(msg.id),
+                                "trace_id": trace_ids.get(msg.chat_id, msg.id),
                             },
                             ensure_ascii=False,
                         )

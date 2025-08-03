@@ -20,6 +20,9 @@ class DummyLangfuse:
     def update_current_generation(self, **kwargs):  # noqa: D401 - test stub
         self.generations.append(kwargs)
 
+    def get_current_trace_id(self):  # noqa: D401 - test stub
+        return "tid"
+
 
 def test_init_langfuse(monkeypatch):
     recorded = {}
@@ -71,7 +74,9 @@ async def test_match_prompt_logs(monkeypatch):
     prompt = prompts.Prompt(name="p", prompt="p")
     res = await prompts.match_prompt(prompt, "text", "i", "c")
 
-    assert res == result_obj
+    assert res == prompts.MatchPromptResult(
+        score=4, reasoning="", quote="f", trace_id="tid"
+    )
     assert dummy.traces[0]["name"] == "p"
     assert dummy.traces[0]["input"] == "text"
     assert dummy.traces[0]["output"] == result_obj.model_dump()
@@ -191,7 +196,9 @@ async def test_match_prompt_lf_config(monkeypatch):
 
     res = await prompts.match_prompt(p, "text")
 
-    assert res == result_obj
+    assert res == prompts.MatchPromptResult(
+        score=3, reasoning="", quote="f", trace_id="tid"
+    )
     assert recorded["temperature"] == 0.1
     # generation logging was removed
     assert dummy.generations == []

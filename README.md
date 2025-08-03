@@ -52,7 +52,7 @@ forward those containing any of the specified words to their target chats.
 Statistics about processed messages are stored in `data/stats.json`. If you
 have a file in the old format (without the `stats` section), it will be
 automatically converted on startup using the new `Stats` structure. Trace IDs
-for forwarded messages are saved in `data/trace_ids.json`.
+for forwarded messages are saved in `data/trace_ids.json`, grouped by chat ID.
 
 ## Generate evaluation datasets
 
