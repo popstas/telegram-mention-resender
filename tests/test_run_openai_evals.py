@@ -62,7 +62,12 @@ def test_run_openai_evals(tmp_path, monkeypatch):
     base = evals.get_eval_path("Inst", "Prompt", "suf")
     base.mkdir(parents=True, exist_ok=True)
     with (base / "messages.jsonl").open("w", encoding="utf-8") as fh:
-        fh.write(json.dumps({"input": "good", "expected": {"is_match": True}}) + "\n")
+        fh.write(
+            json.dumps(
+                {"input": "good", "expected": {"is_match": True}, "trace_id": "t1"}
+            )
+            + "\n"
+        )
 
     dummy = DummyClient()
     monkeypatch.setattr(roe, "OpenAI", lambda api_key=None: dummy)

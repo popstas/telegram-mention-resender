@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import json
-import os
 from typing import Iterable
 
 from telethon import TelegramClient
@@ -9,10 +8,11 @@ from telethon import TelegramClient
 from .config import get_api_credentials, load_config, load_instances
 from .evals import get_eval_path
 from .telegram_utils import get_safe_name
+from .trace_ids import trace_ids
 
 
-async def _fetch_texts(client: TelegramClient, entity) -> Iterable[str]:
-    """Yield text of all messages from ``entity``."""
+async def _fetch_messages(client: TelegramClient, entity) -> Iterable:
+    """Yield messages from ``entity`` that contain text."""
     async for msg in client.iter_messages(entity):
         text = (
             getattr(msg, "message", None)
@@ -20,7 +20,7 @@ async def _fetch_texts(client: TelegramClient, entity) -> Iterable[str]:
             or getattr(msg, "raw_text", None)
         )
         if text:
-            yield text
+            yield msg
 
 
 async def generate_evals(suffix: str) -> None:
@@ -44,21 +44,39 @@ async def generate_evals(suffix: str) -> None:
 
             msg_path = base / "messages.jsonl"
             with msg_path.open("w", encoding="utf-8") as fh:
-                async for text in _fetch_texts(client, inst.true_positive_entity):
-                    fh.write(
-                        json.dumps(
-                            {"input": text, "expected": {"is_match": True}},
-                            ensure_ascii=False,
-                        )
-                        + "\n"
+                async for msg in _fetch_messages(client, inst.true_positive_entity):
+                    text = (
+                        getattr(msg, "message", None)
+                        or getattr(msg, "text", None)
+                        or getattr(msg, "raw_text", None)
                     )
-                async for text in _fetch_texts(client, inst.false_positive_entity):
                     fh.write(
                         json.dumps(
-                            {"input": text, "expected": {"is_match": False}},
+                            {
+                                "input": text,
+                                "expected": {"is_match": True},
+                                "trace_id": trace_ids.get(msg.id),
+                            },
                             ensure_ascii=False,
                         )
-                        + "\n"
+                        + "\n",
+                    )
+                async for msg in _fetch_messages(client, inst.false_positive_entity):
+                    text = (
+                        getattr(msg, "message", None)
+                        or getattr(msg, "text", None)
+                        or getattr(msg, "raw_text", None)
+                    )
+                    fh.write(
+                        json.dumps(
+                            {
+                                "input": text,
+                                "expected": {"is_match": False},
+                                "trace_id": trace_ids.get(msg.id),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n",
                     )
 
             model = (prompt.config or {}).get("model", "gpt-4.1")

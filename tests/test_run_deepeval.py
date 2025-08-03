@@ -29,8 +29,8 @@ async def test_run_deepeval(tmp_path, monkeypatch):
     base = evals.get_eval_path("Inst", "Prompt", "suf")
     base.mkdir(parents=True, exist_ok=True)
     messages = [
-        {"input": "good", "expected": {"is_match": True}},
-        {"input": "bad", "expected": {"is_match": False}},
+        {"input": "good", "expected": {"is_match": True}, "trace_id": "t1"},
+        {"input": "bad", "expected": {"is_match": False}, "trace_id": "t2"},
     ]
     with (base / "messages.jsonl").open("w", encoding="utf-8") as fh:
         for row in messages:

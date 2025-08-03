@@ -1,16 +1,17 @@
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import yaml
 
 import src.config as config_module
 import src.generate_evals as ge
+from src.trace_ids import trace_ids
 
 
 class DummyMessage:
-    def __init__(self, text: str):
+    def __init__(self, msg_id: int, text: str):
+        self.id = msg_id
         self.text = text
         self.message = text
         self.raw_text = text
@@ -27,8 +28,8 @@ class DummyClient:
         return None
 
     async def iter_messages(self, entity):
-        for text in self._messages.get(entity, []):
-            yield DummyMessage(text)
+        for msg in self._messages.get(entity, []):
+            yield msg
 
 
 @pytest.mark.asyncio
@@ -61,7 +62,12 @@ async def test_generate_evals(tmp_path, monkeypatch):
     }
     cfg_path.write_text(yaml.dump(cfg), encoding="utf-8")
 
-    msgs = {"pos": ["p1", "p2"], "neg": ["n1"]}
+    msgs = {
+        "pos": [DummyMessage(1, "p1"), DummyMessage(2, "p2")],
+        "neg": [DummyMessage(3, "n1")],
+    }
+    for m in msgs["pos"] + msgs["neg"]:
+        trace_ids.set(m.id, f"t{m.id}")
     monkeypatch.setattr(ge, "TelegramClient", lambda *a, **k: DummyClient(msgs))
 
     await ge.generate_evals("suf")
@@ -71,9 +77,9 @@ async def test_generate_evals(tmp_path, monkeypatch):
     assert data.exists()
     lines = [json.loads(l) for l in data.read_text(encoding="utf-8").splitlines()]
     assert lines == [
-        {"input": "p1", "expected": {"is_match": True}},
-        {"input": "p2", "expected": {"is_match": True}},
-        {"input": "n1", "expected": {"is_match": False}},
+        {"input": "p1", "expected": {"is_match": True}, "trace_id": "t1"},
+        {"input": "p2", "expected": {"is_match": True}, "trace_id": "t2"},
+        {"input": "n1", "expected": {"is_match": False}, "trace_id": "t3"},
     ]
     task = (base / "task.yml").read_text(encoding="utf-8")
     assert "eval_name: Inst_Prompt" in task

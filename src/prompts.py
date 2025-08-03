@@ -130,16 +130,20 @@ class EvaluateResult(BaseModel):
     score: Annotated[int, Field(ge=0, le=5, description="Уровень")] = 0
 
 
+class MatchPromptResult(EvaluateResult):
+    trace_id: str | None = None
+
+
 @observe()
 async def match_prompt(
     prompt: Prompt,
     text: str,
     inst_name: str | None = None,
     chat_name: str | None = None,
-) -> EvaluateResult:
+) -> MatchPromptResult:
     """Return :class:`EvaluateResult` for ``text`` using OpenAI."""
     if not prompt.prompt or not config.get("openai_api_key"):
-        return EvaluateResult(score=0, reasoning="", quote="")
+        return MatchPromptResult(score=0, reasoning="", quote="", trace_id=None)
 
     proxy = config.get("proxy_url")
     http_client = httpx.Client(proxy=proxy) if proxy else None
@@ -182,16 +186,23 @@ async def match_prompt(
             stats.add_tokens(inst_name, tokens)
     except Exception as exc:  # pragma: no cover - external call
         logger.error("Failed to query OpenAI: %s", exc)
-        result = EvaluateResult(score=0, reasoning="", quote="")
+        result = MatchPromptResult(score=0, reasoning="", quote="", trace_id=None)
     logger.debug(
         '%s - %s: %s - "%s"', prompt.name, result.score, result.reasoning, result.quote
     )
 
+    match_prompt_result = MatchPromptResult(
+        score=result.score,
+        reasoning=result.reasoning,
+        quote=result.quote,
+        trace_id=None,
+    )
     if langfuse is not None:
         try:
-            # langfuse.update_current_generation(
-            #     prompt=getattr(prompt, "_lf_prompt", None)
-            # )
+            match_prompt_result.trace_id = (
+                langfuse.get_current_trace_id() if langfuse is not None else None
+            )
+
             langfuse.update_current_trace(
                 name=prompt.name,
                 input=text,
@@ -200,7 +211,7 @@ async def match_prompt(
         except Exception as exc:  # pragma: no cover - optional external call
             logger.error("Failed to log Langfuse trace: %s", exc)
 
-    return result
+    return match_prompt_result
 
 
 async def load_langfuse_prompts(instances: list["Instance"]) -> None:

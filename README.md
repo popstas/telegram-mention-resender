@@ -13,6 +13,7 @@ matching messages to a target chat.
 - Forwarded messages include a link to the original message
 - Prompt-triggered forwards include a short reason and quote from the message
 - Reactions (👍/👎) forward messages to true/false positive chats once per message
+- Langfuse trace IDs for forwarded messages are recorded
 
 ## Setup
 
@@ -50,7 +51,8 @@ forward those containing any of the specified words to their target chats.
 
 Statistics about processed messages are stored in `data/stats.json`. If you
 have a file in the old format (without the `stats` section), it will be
-automatically converted on startup using the new `Stats` structure.
+automatically converted on startup using the new `Stats` structure. Trace IDs
+for forwarded messages are saved in `data/trace_ids.json`.
 
 ## Generate evaluation datasets
 
@@ -61,7 +63,8 @@ python -m src.generate_evals --suffix run1
 ```
 
 Datasets and configuration files will be written to `data/evals/` with the
-provided suffix.
+provided suffix. Each line in `messages.jsonl` also contains a `trace_id`
+linking back to the corresponding Langfuse trace.
 
 ## Run evaluations
 
