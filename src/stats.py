@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 STATS_PATH = os.path.join("data", "stats.json")
 
 
+def current_day() -> str:
+    """Return the current day string in UTC."""
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+
+
 @dataclass
 class Stats:
     """Statistics counters for processed messages."""
@@ -96,13 +101,24 @@ class StatsTracker:
         self.data.setdefault("instances", []).append(inst)
         return inst
 
-    def increment(self, name: str) -> None:
+    def increment(
+        self,
+        name: str,
+        forwarded: bool = False,
+        used_word: bool = False,
+        used_prompt: bool = False,
+    ) -> None:
         inst = self._get_inst(name)
-        self.data["stats"]["total"] = self.data["stats"].get("total", 0) + 1
-        inst["stats"]["total"] = inst["stats"].get("total", 0) + 1
-        day = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+        day = current_day()
         day_stat = inst["days"].setdefault(day, {"stats": Stats().to_dict()})
-        day_stat["stats"]["total"] = day_stat["stats"].get("total", 0) + 1
+        for scope in (self.data["stats"], inst["stats"], day_stat["stats"]):
+            scope["total"] = scope.get("total", 0) + 1
+            if forwarded:
+                scope["forwarded_total"] = scope.get("forwarded_total", 0) + 1
+                if used_word:
+                    scope["forwarded_words"] = scope.get("forwarded_words", 0) + 1
+                if used_prompt:
+                    scope["forwarded_prompt"] = scope.get("forwarded_prompt", 0) + 1
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()

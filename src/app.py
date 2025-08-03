@@ -101,7 +101,6 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             inst.name,
         )
         return
-    stats.increment(inst.name)
     chat_name = await get_chat_name(event.chat_id, safe=True)
     forward = False
     used_word: str | None = None
@@ -173,6 +172,12 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
             chat_name,
             inst.name,
         )
+    stats.increment(
+        inst.name,
+        forwarded=forward,
+        used_word=used_word is not None,
+        used_prompt=used_prompt is not None,
+    )
 
 
 async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
