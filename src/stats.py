@@ -127,8 +127,10 @@ class StatsTracker:
         if tokens <= 0:
             return
         inst = self._get_inst(name)
-        self.data["stats"]["tokens"] = self.data["stats"].get("tokens", 0) + tokens
-        inst["stats"]["tokens"] = inst["stats"].get("tokens", 0) + tokens
+        day = current_day()
+        day_stat = inst["days"].setdefault(day, {"stats": Stats().to_dict()})
+        for scope in (self.data["stats"], inst["stats"], day_stat["stats"]):
+            scope["tokens"] = scope.get("tokens", 0) + tokens
         inst["tokens"] = inst.get("tokens", 0) + tokens
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:

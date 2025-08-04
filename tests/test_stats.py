@@ -32,6 +32,7 @@ def test_stats_increment_and_flush(tmp_path):
     assert inst_a["days"][day]["stats"]["forwarded_total"] == 2
     assert inst_a["days"][day]["stats"]["forwarded_words"] == 1
     assert inst_a["days"][day]["stats"]["forwarded_prompt"] == 1
+    assert inst_a["days"][day]["stats"]["tokens"] == 10
 
 
 def test_convert_old_format():

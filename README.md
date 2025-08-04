@@ -52,10 +52,10 @@ forward those containing any of the specified words to their target chats.
 Statistics about processed messages are stored in `data/stats.json` and include
 overall, per-instance and per-day counters. Besides the total processed
 messages, the file tracks how many were forwarded in total, due to word matches
-or prompt matches, and the number of tokens consumed. If you have a file in the
-old format (without the `stats` section), it will be automatically converted on
-startup using the new `Stats` structure. Trace IDs for forwarded messages are
-saved in `data/trace_ids.json`, grouped by chat ID.
+or prompt matches, and the number of tokens consumed in each scope. If you have
+a file in the old format (without the `stats` section), it will be automatically
+converted on startup using the new `Stats` structure. Trace IDs for forwarded
+messages are saved in `data/trace_ids.json`, grouped by chat ID.
 
 ## Generate evaluation datasets
 
