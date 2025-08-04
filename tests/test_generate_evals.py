@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-import src.config as config_module
 import src.generate_evals as ge
 from src.trace_ids import trace_ids
 
@@ -38,7 +37,6 @@ async def test_generate_evals(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     cfg_path = tmp_path / "config.yml"
-    monkeypatch.setattr(config_module, "CONFIG_PATH", cfg_path)
 
     cfg = {
         "api_id": 1,
@@ -71,7 +69,7 @@ async def test_generate_evals(tmp_path, monkeypatch):
         trace_ids.set(m.chat_id, m.id, f"t{m.id}")
     monkeypatch.setattr(ge, "TelegramClient", lambda *a, **k: DummyClient(msgs))
 
-    await ge.generate_evals("suf")
+    await ge.generate_evals("suf", config_path=str(cfg_path))
 
     base = Path("data/evals/Inst_Prompt_suf")
     data = base / "messages.jsonl"

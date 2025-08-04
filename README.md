@@ -65,6 +65,8 @@ Build evaluation tasks from collected true and false positive messages:
 python -m src.generate_evals --suffix run1
 ```
 
+Use `--config` to provide a custom path to `config.yml` if needed.
+
 Datasets and configuration files will be written to `data/evals/` with the
 provided suffix. Each line in `messages.jsonl` also contains a `trace_id`
 linking back to the corresponding Langfuse trace.
