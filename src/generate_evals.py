@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 from typing import Iterable
 
 from telethon import TelegramClient
@@ -23,8 +24,14 @@ async def _fetch_messages(client: TelegramClient, entity) -> Iterable:
             yield msg
 
 
-async def generate_evals(suffix: str) -> None:
+async def generate_evals(suffix: str, *, config_path: str | None = None) -> None:
     """Generate evaluation datasets from true/false positive entities."""
+    if config_path:
+        os.environ["CONFIG_PATH"] = config_path
+        from . import config as config_module
+
+        config_module.CONFIG_PATH = config_path
+
     config = load_config()
     api_id, api_hash, session = get_api_credentials(config)
     client = TelegramClient(session, api_id, api_hash)
@@ -123,8 +130,9 @@ python -m src.run_openai_evals --instance \"{inst.name}\" --prompt \"{prompt.nam
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate evaluation datasets")
     parser.add_argument("--suffix", required=True, help="Folder suffix")
+    parser.add_argument("--config", help="Path to config.yml", default=None)
     args = parser.parse_args()
-    asyncio.run(generate_evals(args.suffix))
+    asyncio.run(generate_evals(args.suffix, config_path=args.config))
 
 
 if __name__ == "__main__":
