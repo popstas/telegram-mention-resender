@@ -16,6 +16,7 @@ class FolderTopic:
 
     name: str
     message: str | None = None
+    username: str | None = None
 
 
 @dataclass
@@ -113,6 +114,7 @@ async def load_instances(config: dict) -> List[Instance]:
                 FolderTopic(
                     name=name,
                     message=topic_cfg.get("message"),
+                    username=topic_cfg.get("username"),
                 )
             )
 
