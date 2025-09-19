@@ -200,6 +200,13 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
     dummy_client = DummyClient()
     monkeypatch.setattr(tgu, "client", dummy_client)
 
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(delay):
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr(tgu.asyncio, "sleep", fake_sleep)
+
     folder = SimpleNamespace(title="Folder", include_peers=[SimpleNamespace(id=1)])
 
     async def fake_list_folders():
@@ -215,4 +222,5 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
     _, sent_message, kwargs = dummy_client.sent[0]
     assert sent_message == "hello"
     assert kwargs.get("reply_to") == 101
+    assert sleep_calls == [2]
     assert any("chat 123 thread 101" in rec.message for rec in caplog.records)

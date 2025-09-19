@@ -379,6 +379,7 @@ async def add_topic_from_folders(
                 thread_id = top_msg_id if top_msg_id is not None else topic_id
                 if topic.message and thread_id is not None:
                     try:
+                        await asyncio.sleep(2)
                         await client.send_message(
                             channel,
                             topic.message,
