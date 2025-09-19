@@ -42,8 +42,9 @@ pip install -r requirements.txt
   and `no_forward_message`.
 
 `folder_add_topic` is a list of topics that should exist in every chat inside the
-instance folders. When a topic is missing, the bot will create it and send an
-optional activation message inside the new thread.
+instance folders. When a topic is missing, the bot will create it, send an
+optional activation message inside the new thread, and invite an optional
+`username` to the chat.
 
 ## Running
 

@@ -170,6 +170,7 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
         def __init__(self):
             self.topics: list = []
             self.sent: list = []
+            self.invites: list = []
 
         async def get_entity(self, _):
             return types.Channel(
@@ -181,6 +182,9 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
                 forum=True,
             )
 
+        async def get_input_entity(self, username):
+            return username
+
         async def __call__(self, request):
             if isinstance(request, functions.channels.GetForumTopicsRequest):
                 matches = [t for t in self.topics if t.title == request.q]
@@ -191,6 +195,9 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
                     id=topic_id, title=request.title, top_message=topic_id + 100
                 )
                 self.topics.append(topic)
+                return SimpleNamespace()
+            if isinstance(request, functions.channels.InviteToChannelRequest):
+                self.invites.append(request.users)
                 return SimpleNamespace()
             raise AssertionError("Unexpected request")
 
@@ -214,7 +221,9 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
 
     monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
 
-    topics = [config.FolderTopic(name="Topic", message="hello")]
+    topics = [
+        config.FolderTopic(name="Topic", message="hello", username="@user")
+    ]
     result = await tgu.add_topic_from_folders(["Folder"], topics)
 
     assert result == [(123, 101, "Chat")]
@@ -224,3 +233,56 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
     assert kwargs.get("reply_to") == 101
     assert sleep_calls == [2]
     assert any("chat 123 thread 101" in rec.message for rec in caplog.records)
+    assert dummy_client.invites == [["@user"]]
+
+
+@pytest.mark.asyncio
+async def test_add_topic_from_folders_existing_topic_invites(monkeypatch):
+    from datetime import datetime
+
+    from telethon import functions, types
+
+    class DummyClient:
+        def __init__(self):
+            self.topics: list = [
+                SimpleNamespace(id=1, title="Topic", top_message=101)
+            ]
+            self.invites: list = []
+
+        async def get_entity(self, _):
+            return types.Channel(
+                id=123,
+                title="Chat",
+                photo=None,
+                date=datetime.now(),
+                megagroup=True,
+                forum=True,
+            )
+
+        async def get_input_entity(self, username):
+            return username
+
+        async def __call__(self, request):
+            if isinstance(request, functions.channels.GetForumTopicsRequest):
+                matches = [t for t in self.topics if t.title == request.q]
+                return SimpleNamespace(topics=matches)
+            if isinstance(request, functions.channels.InviteToChannelRequest):
+                self.invites.append(request.users)
+                return SimpleNamespace()
+            raise AssertionError("Unexpected request")
+
+    dummy_client = DummyClient()
+    monkeypatch.setattr(tgu, "client", dummy_client)
+
+    folder = SimpleNamespace(title="Folder", include_peers=[SimpleNamespace(id=1)])
+
+    async def fake_list_folders():
+        return [folder]
+
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
+
+    topics = [config.FolderTopic(name="Topic", username="@user")]
+    result = await tgu.add_topic_from_folders(["Folder"], topics)
+
+    assert result == []
+    assert dummy_client.invites == [["@user"]]
