@@ -375,15 +375,14 @@ async def add_topic_from_folders(
                 if not created:
                     continue
                 topic_id = getattr(created, "id", None)
-                if topic.message and topic_id is not None:
+                top_msg_id = getattr(created, "top_message", None)
+                thread_id = top_msg_id if top_msg_id is not None else topic_id
+                if topic.message and thread_id is not None:
                     try:
                         await client.send_message(
                             channel,
                             topic.message,
-                            reply_to=types.InputReplyToMessage(
-                                reply_to_msg_id=topic_id,
-                                top_msg_id=topic_id,
-                            ),
+                            reply_to=thread_id,
                         )
                     except Exception as exc:  # pylint: disable=broad-except
                         logger.error(
@@ -392,11 +391,11 @@ async def add_topic_from_folders(
                             chat_id,
                             exc,
                         )
-                added.append((chat_id, topic_id, chat_title))
+                added.append((chat_id, thread_id, chat_title))
                 logger.info(
                     "Added topic to chat %s thread %s (%s)",
                     chat_id,
-                    topic_id,
+                    thread_id,
                     chat_title,
                 )
     return added

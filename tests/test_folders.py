@@ -187,7 +187,9 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
                 return SimpleNamespace(topics=matches)
             if isinstance(request, functions.channels.CreateForumTopicRequest):
                 topic_id = len(self.topics) + 1
-                topic = SimpleNamespace(id=topic_id, title=request.title)
+                topic = SimpleNamespace(
+                    id=topic_id, title=request.title, top_message=topic_id + 100
+                )
                 self.topics.append(topic)
                 return SimpleNamespace()
             raise AssertionError("Unexpected request")
@@ -208,11 +210,9 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
     topics = [config.FolderTopic(name="Topic", message="hello")]
     result = await tgu.add_topic_from_folders(["Folder"], topics)
 
-    assert result == [(123, 1, "Chat")]
+    assert result == [(123, 101, "Chat")]
     assert dummy_client.sent
     _, sent_message, kwargs = dummy_client.sent[0]
     assert sent_message == "hello"
-    assert isinstance(kwargs.get("reply_to"), types.InputReplyToMessage)
-    assert kwargs["reply_to"].top_msg_id == 1
-    assert kwargs["reply_to"].reply_to_msg_id == 1
-    assert any("chat 123 thread 1" in rec.message for rec in caplog.records)
+    assert kwargs.get("reply_to") == 101
+    assert any("chat 123 thread 101" in rec.message for rec in caplog.records)
