@@ -9,6 +9,7 @@ from .config import Instance, get_api_credentials, load_config, load_instances
 from .prompts import Prompt, match_prompt
 from .stats import stats as global_stats
 from .telegram_utils import (
+    add_topic_from_folders,
     find_word,
     get_chat_name,
     get_folders_chat_ids,
@@ -63,6 +64,8 @@ async def update_instance_chat_ids(instance: Instance, first_run: bool = False) 
     instance.chat_ids = await normalize_chat_ids(new_ids)
     if instance.folder_mute:
         await mute_chats_from_folders(instance.folders)
+    if instance.folder_add_topic:
+        await add_topic_from_folders(instance.folders, instance.folder_add_topic)
     log_level = logging.INFO if first_run else logging.DEBUG
     logger.log(
         log_level,

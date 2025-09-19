@@ -35,3 +35,22 @@ def test_config_path_env_override(tmp_path, monkeypatch):
     cfg_module = importlib.reload(config)
     assert cfg_module.CONFIG_PATH == str(cfg)
     assert cfg_module.load_config() == {"bar": 2}
+
+
+@pytest.mark.asyncio
+async def test_load_instances_folder_add_topic():
+    cfg = {
+        "instances": [
+            {
+                "name": "inst",
+                "words": [],
+                "folder_add_topic": [{"name": "Topic", "message": "hello"}],
+            }
+        ]
+    }
+
+    instances = await config.load_instances(cfg)
+    assert instances[0].folder_add_topic
+    topic = instances[0].folder_add_topic[0]
+    assert topic.name == "Topic"
+    assert topic.message == "hello"
