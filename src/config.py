@@ -11,6 +11,14 @@ CONFIG_PATH = os.environ.get("CONFIG_PATH", os.path.join("data", "config.yml"))
 
 
 @dataclass
+class FolderTopic:
+    """Configuration for automatically created folder topics."""
+
+    name: str
+    message: str | None = None
+
+
+@dataclass
 class Instance:
     """Configuration for a single monitoring instance."""
 
@@ -28,6 +36,7 @@ class Instance:
     folder_mute: bool = False
     no_forward_message: bool = False
     prompts: List[Prompt] = field(default_factory=list)
+    folder_add_topic: List[FolderTopic] = field(default_factory=list)
 
 
 def load_config() -> dict:
@@ -93,6 +102,20 @@ async def load_instances(config: dict) -> List[Instance]:
             else:
                 parsed_prompts.append(Prompt(prompt=p))
 
+        folder_topics: List[FolderTopic] = []
+        for topic_cfg in inst_cfg.get("folder_add_topic", []):
+            if not isinstance(topic_cfg, dict):
+                continue
+            name = topic_cfg.get("name")
+            if not name:
+                continue
+            folder_topics.append(
+                FolderTopic(
+                    name=name,
+                    message=topic_cfg.get("message"),
+                )
+            )
+
         instance = Instance(
             name=inst_cfg.get("name", "instance"),
             folders=inst_cfg.get("folders", []),
@@ -108,6 +131,7 @@ async def load_instances(config: dict) -> List[Instance]:
             folder_mute=inst_cfg.get("folder_mute", False),
             no_forward_message=inst_cfg.get("no_forward_message", False),
             prompts=parsed_prompts,
+            folder_add_topic=folder_topics,
         )
         parsed_instances.append(instance)
     return parsed_instances

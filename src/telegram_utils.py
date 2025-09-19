@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import re
-from typing import List, Set
+from typing import List, Sequence, Set
 
 from telethon import functions, types
 from telethon.utils import get_peer_id, resolve_id
@@ -296,6 +296,110 @@ async def get_folders_chat_ids(config_folders):
                 chat_ids.add(chat_id)
 
     return chat_ids
+
+
+async def _get_forum_topic_by_name(channel, title: str):
+    try:
+        result = await client(
+            functions.channels.GetForumTopicsRequest(
+                channel=channel,
+                offset_date=0,
+                offset_id=0,
+                offset_topic=0,
+                limit=100,
+                q=title,
+            )
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error(
+            "Failed to fetch topics for %s: %s", getattr(channel, "id", channel), exc
+        )
+        return None
+
+    for topic in getattr(result, "topics", []) or []:
+        if getattr(topic, "title", "") == title:
+            return topic
+    return None
+
+
+async def _create_forum_topic(channel, title: str):
+    try:
+        await client(
+            functions.channels.CreateForumTopicRequest(channel=channel, title=title)
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error(
+            "Failed to create topic '%s' for %s: %s",
+            title,
+            getattr(channel, "id", channel),
+            exc,
+        )
+        return None
+    return await _get_forum_topic_by_name(channel, title)
+
+
+async def add_topic_from_folders(
+    folder_names: List[str], topics: Sequence["FolderTopic"]
+):
+    from .config import FolderTopic  # Local import to avoid circular dependency
+
+    if not folder_names or not topics:
+        return []
+
+    added: List[tuple[int | None, int | None, str]] = []
+    folders = await list_folders()
+    for fname in folder_names:
+        folder = await get_folder(folders, fname)
+        if not folder:
+            continue
+        for peer in getattr(folder, "include_peers", []) or []:
+            try:
+                channel = await client.get_entity(peer)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.error("Failed to get entity for peer %s: %s", peer, exc)
+                continue
+            if not isinstance(channel, types.Channel) or not (
+                getattr(channel, "megagroup", False)
+                and getattr(channel, "forum", False)
+            ):
+                continue
+            chat_id = getattr(channel, "id", None)
+            chat_title = getattr(channel, "title", "") or ""
+            for topic in topics:
+                if not isinstance(topic, FolderTopic):
+                    continue
+                existing = await _get_forum_topic_by_name(channel, topic.name)
+                if existing:
+                    continue
+                created = await _create_forum_topic(channel, topic.name)
+                if not created:
+                    continue
+                topic_id = getattr(created, "id", None)
+                if topic.message and topic_id is not None:
+                    try:
+                        await client.send_message(
+                            channel,
+                            topic.message,
+                            reply_to=types.InputReplyToMessage(
+                                reply_to_msg_id=topic_id,
+                                top_msg_id=topic_id,
+                            ),
+                        )
+                    except Exception as exc:  # pylint: disable=broad-except
+                        logger.error(
+                            "Failed to send message to topic '%s' in chat %s: %s",
+                            topic.name,
+                            chat_id,
+                            exc,
+                        )
+                added.append((chat_id, topic_id, chat_title))
+                logger.info(
+                    "Added topic to chat %s thread %s (%s)",
+                    chat_id,
+                    topic_id,
+                    chat_title,
+                )
+    return added
 
 
 async def resolve_entities(entities: List[str]) -> Set[int]:

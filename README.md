@@ -14,6 +14,7 @@ matching messages to a target chat.
 - Prompt-triggered forwards include a short reason and quote from the message
 - Reactions (👍/👎) forward messages to true/false positive chats once per message
 - Langfuse trace IDs for forwarded messages are recorded
+- Automatically create forum topics for chats collected from folders
 
 ## Setup
 
@@ -37,8 +38,12 @@ pip install -r requirements.txt
 - `ignore_user_ids` – list of user IDs to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `negative_words`, `ignore_words`, `target_chat`,
-  `target_entity`, `folder_mute`, `false_positive_entity`, `true_positive_entity` and
-  `no_forward_message`.
+  `target_entity`, `folder_mute`, `folder_add_topic`, `false_positive_entity`, `true_positive_entity`
+  and `no_forward_message`.
+
+`folder_add_topic` is a list of topics that should exist in every chat inside the
+instance folders. When a topic is missing, the bot will create it and send an
+optional activation message inside the new thread.
 
 ## Running
 

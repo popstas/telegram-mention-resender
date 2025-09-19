@@ -14,6 +14,9 @@ instances:
     entities:
       - https://t.me/tboom_66
     folders: []
+    folder_add_topic:
+      - name: Community Updates
+        message: "/activate@example_updates_bot"
     folder_mute: false
     no_forward_message: false
     words: ["my username"]

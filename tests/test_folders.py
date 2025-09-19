@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 import src.app as app
+import src.config as config
 import src.telegram_utils as tgu
 
 
@@ -61,6 +62,12 @@ async def test_update_instance_chat_ids(monkeypatch):
         assert entities == ["e"]
         return {6}
 
+    added_topics: list[tuple[list[str], list]] = []
+
+    async def fake_add_topics(folders, topics):
+        added_topics.append((folders, topics))
+        return []
+
     async def fake_get_input_entity(cid):
         from telethon import types
 
@@ -71,13 +78,21 @@ async def test_update_instance_chat_ids(monkeypatch):
     monkeypatch.setattr(tgu, "client", client)
     monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
     monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
+    monkeypatch.setattr(app, "add_topic_from_folders", fake_add_topics)
 
     inst = app.Instance(
-        name="i", words=[], target_chat=0, folders=["f"], chat_ids={4}, entities=["e"]
+        name="i",
+        words=[],
+        target_chat=0,
+        folders=["f"],
+        chat_ids={4},
+        entities=["e"],
+        folder_add_topic=[config.FolderTopic(name="Topic")],
     )
 
     await app.update_instance_chat_ids(inst, True)
     assert inst.chat_ids == {-4, -5, -6}
+    assert added_topics == [(["f"], inst.folder_add_topic)]
 
 
 @pytest.mark.asyncio
@@ -141,3 +156,63 @@ async def test_get_folders_chat_ids_chat_and_user(monkeypatch):
         tgu.get_peer_id(types.PeerUser(8)),
     }
     assert chat_ids == expected
+
+
+@pytest.mark.asyncio
+async def test_add_topic_from_folders(monkeypatch, caplog):
+    from datetime import datetime
+
+    from telethon import functions, types
+
+    caplog.set_level("INFO")
+
+    class DummyClient:
+        def __init__(self):
+            self.topics: list = []
+            self.sent: list = []
+
+        async def get_entity(self, _):
+            return types.Channel(
+                id=123,
+                title="Chat",
+                photo=None,
+                date=datetime.now(),
+                megagroup=True,
+                forum=True,
+            )
+
+        async def __call__(self, request):
+            if isinstance(request, functions.channels.GetForumTopicsRequest):
+                matches = [t for t in self.topics if t.title == request.q]
+                return SimpleNamespace(topics=matches)
+            if isinstance(request, functions.channels.CreateForumTopicRequest):
+                topic_id = len(self.topics) + 1
+                topic = SimpleNamespace(id=topic_id, title=request.title)
+                self.topics.append(topic)
+                return SimpleNamespace()
+            raise AssertionError("Unexpected request")
+
+        async def send_message(self, entity, message, **kwargs):
+            self.sent.append((entity, message, kwargs))
+
+    dummy_client = DummyClient()
+    monkeypatch.setattr(tgu, "client", dummy_client)
+
+    folder = SimpleNamespace(title="Folder", include_peers=[SimpleNamespace(id=1)])
+
+    async def fake_list_folders():
+        return [folder]
+
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
+
+    topics = [config.FolderTopic(name="Topic", message="hello")]
+    result = await tgu.add_topic_from_folders(["Folder"], topics)
+
+    assert result == [(123, 1, "Chat")]
+    assert dummy_client.sent
+    _, sent_message, kwargs = dummy_client.sent[0]
+    assert sent_message == "hello"
+    assert isinstance(kwargs.get("reply_to"), types.InputReplyToMessage)
+    assert kwargs["reply_to"].top_msg_id == 1
+    assert kwargs["reply_to"].reply_to_msg_id == 1
+    assert any("chat 123 thread 1" in rec.message for rec in caplog.records)
