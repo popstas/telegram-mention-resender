@@ -44,7 +44,9 @@ async def test_load_instances_folder_add_topic():
             {
                 "name": "inst",
                 "words": [],
-                "folder_add_topic": [{"name": "Topic", "message": "hello"}],
+                "folder_add_topic": [
+                    {"name": "Topic", "message": "hello", "username": "user"}
+                ],
             }
         ]
     }
@@ -54,3 +56,4 @@ async def test_load_instances_folder_add_topic():
     topic = instances[0].folder_add_topic[0]
     assert topic.name == "Topic"
     assert topic.message == "hello"
+    assert topic.username == "user"
