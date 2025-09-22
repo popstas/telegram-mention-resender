@@ -15,6 +15,36 @@ entity_cache: dict = {}
 MUTE_FOREVER = 2**31 - 1
 
 
+def _format_chat_for_log(chat, *, chat_id=None, chat_title: str | None = None) -> str:
+    """Return a human readable representation of a chat for logging."""
+
+    if chat_id is None:
+        chat_id = (
+            getattr(chat, "id", None)
+            or getattr(chat, "channel_id", None)
+            or getattr(chat, "chat_id", None)
+        )
+
+    title = (
+        (chat_title or "")
+        or getattr(chat, "title", None)
+        or getattr(chat, "username", None)
+        or ""
+    )
+    if isinstance(title, str):
+        title = title.strip()
+    else:
+        title = str(title).strip()
+
+    if title and chat_id is not None:
+        return f"{title} ({chat_id})"
+    if title:
+        return title
+    if chat_id is not None:
+        return str(chat_id)
+    return str(chat)
+
+
 def get_safe_name(name: str) -> str:
     """Return ``name`` with unsafe characters replaced by underscores."""
     safe = re.sub(r"[^\w\-_.]", "_", name.strip())
@@ -299,6 +329,7 @@ async def get_folders_chat_ids(config_folders):
 
 
 async def _get_forum_topic_by_name(channel, title: str):
+    chat_display = _format_chat_for_log(channel)
     try:
         result = await client(
             functions.channels.GetForumTopicsRequest(
@@ -311,9 +342,7 @@ async def _get_forum_topic_by_name(channel, title: str):
             )
         )
     except Exception as exc:  # pylint: disable=broad-except
-        logger.error(
-            "Failed to fetch topics for %s: %s", getattr(channel, "id", channel), exc
-        )
+        logger.error("Failed to fetch topics for %s: %s", chat_display, exc)
         return None
 
     for topic in getattr(result, "topics", []) or []:
@@ -323,6 +352,7 @@ async def _get_forum_topic_by_name(channel, title: str):
 
 
 async def _create_forum_topic(channel, title: str):
+    chat_display = _format_chat_for_log(channel)
     try:
         await client(
             functions.channels.CreateForumTopicRequest(channel=channel, title=title)
@@ -331,7 +361,7 @@ async def _create_forum_topic(channel, title: str):
         logger.error(
             "Failed to create topic '%s' for %s: %s",
             title,
-            getattr(channel, "id", channel),
+            chat_display,
             exc,
         )
         return None
@@ -342,6 +372,7 @@ async def _add_user_to_channel(channel, username: str) -> bool:
     if not username:
         return False
 
+    chat_display = _format_chat_for_log(channel)
     try:
         user = await client.get_input_entity(username)
     except Exception as exc:  # pylint: disable=broad-except
@@ -355,16 +386,16 @@ async def _add_user_to_channel(channel, username: str) -> bool:
         return True
     except errors.UserAlreadyParticipantError:
         logger.debug(
-            "Username '%s' is already a participant of chat %s",
+            "Username '%s' is already a participant of %s",
             username,
-            getattr(channel, "id", channel),
+            chat_display,
         )
         return True
     except Exception as exc:  # pylint: disable=broad-except
         logger.error(
-            "Failed to add username '%s' to chat %s: %s",
+            "Failed to add username '%s' to %s: %s",
             username,
-            getattr(channel, "id", channel),
+            chat_display,
             exc,
         )
     return False
@@ -427,9 +458,11 @@ async def add_topic_from_folders(
                         )
                     except Exception as exc:  # pylint: disable=broad-except
                         logger.error(
-                            "Failed to send message to topic '%s' in chat %s: %s",
+                            "Failed to send message to topic '%s' in %s: %s",
                             topic.name,
-                            chat_id,
+                            _format_chat_for_log(
+                                channel, chat_id=chat_id, chat_title=chat_title
+                            ),
                             exc,
                         )
                 added.append((chat_id, thread_id, chat_title))
