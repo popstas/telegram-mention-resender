@@ -338,26 +338,28 @@ async def _create_forum_topic(channel, title: str):
     return await _get_forum_topic_by_name(channel, title)
 
 
-async def _add_user_to_channel(channel, username: str) -> None:
+async def _add_user_to_channel(channel, username: str) -> bool:
     if not username:
-        return
+        return False
 
     try:
         user = await client.get_input_entity(username)
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Failed to resolve username '%s': %s", username, exc)
-        return
+        return False
 
     try:
         await client(
             functions.channels.InviteToChannelRequest(channel=channel, users=[user])
         )
+        return True
     except errors.UserAlreadyParticipantError:
         logger.debug(
             "Username '%s' is already a participant of chat %s",
             username,
             getattr(channel, "id", channel),
         )
+        return True
     except Exception as exc:  # pylint: disable=broad-except
         logger.error(
             "Failed to add username '%s' to chat %s: %s",
@@ -365,6 +367,7 @@ async def _add_user_to_channel(channel, username: str) -> None:
             getattr(channel, "id", channel),
             exc,
         )
+    return False
 
 
 async def add_topic_from_folders(
@@ -397,6 +400,9 @@ async def add_topic_from_folders(
             for topic in topics:
                 if not isinstance(topic, FolderTopic):
                     continue
+                user_added = await _add_user_to_channel(channel, topic.username)
+                if not user_added:
+                    continue
                 existing = await _get_forum_topic_by_name(channel, topic.name)
                 topic_created = False
                 target_topic = existing
@@ -406,7 +412,6 @@ async def add_topic_from_folders(
                         continue
                     topic_created = True
                     target_topic = created
-                await _add_user_to_channel(channel, topic.username)
                 if not topic_created:
                     continue
                 topic_id = getattr(target_topic, "id", None)

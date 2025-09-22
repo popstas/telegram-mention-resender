@@ -64,8 +64,10 @@ async def update_instance_chat_ids(instance: Instance, first_run: bool = False) 
     instance.chat_ids = await normalize_chat_ids(new_ids)
     if instance.folder_mute:
         await mute_chats_from_folders(instance.folders)
+        exit()
     if instance.folder_add_topic:
         await add_topic_from_folders(instance.folders, instance.folder_add_topic)
+        exit()
     log_level = logging.INFO if first_run else logging.DEBUG
     logger.log(
         log_level,
