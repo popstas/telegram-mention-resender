@@ -286,3 +286,28 @@ async def test_add_topic_from_folders_existing_topic_invites(monkeypatch):
 
     assert result == []
     assert dummy_client.invites == [["@user"]]
+
+
+@pytest.mark.asyncio
+async def test_add_topic_logs_group_name_on_invite_error(monkeypatch, caplog):
+    from telethon import functions
+
+    class DummyClient:
+        async def get_input_entity(self, username):
+            return username
+
+        async def __call__(self, request):
+            if isinstance(request, functions.channels.InviteToChannelRequest):
+                raise RuntimeError("boom")
+            raise AssertionError("Unexpected request")
+
+    dummy_client = DummyClient()
+    monkeypatch.setattr(tgu, "client", dummy_client)
+
+    channel = SimpleNamespace(id=123, title="Chat")
+
+    with caplog.at_level("ERROR"):
+        await tgu._add_user_to_channel(channel, "@user")
+
+    assert any("Chat" in record.message for record in caplog.records)
+    assert any("123" in record.message for record in caplog.records)
