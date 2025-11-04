@@ -503,6 +503,7 @@ async def mute_notify_peer(notify_peer) -> None:
                     settings=types.InputPeerNotifySettings(mute_until=MUTE_FOREVER),
                 )
             )
+            logger.info("Muted peer %s", notify_peer)
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Failed to mute peer %s: %s", notify_peer, exc)
 
