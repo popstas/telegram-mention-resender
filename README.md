@@ -63,6 +63,21 @@ a file in the old format (without the `stats` section), it will be automatically
 converted on startup using the new `Stats` structure. Trace IDs for forwarded
 messages are saved in `data/trace_ids.json`, grouped by chat ID.
 
+## Bulk operations
+
+Use the `bulk` CLI to perform batch operations on all chats in a folder:
+
+```bash
+# Mute all chats in a folder
+python -m src.bulk --folder MyFolder --mute
+
+# Add a user to all chats in a folder
+python -m src.bulk --folder MyFolder --add-user @username
+
+# Combine actions
+python -m src.bulk --folder MyFolder --mute --add-user @username
+```
+
 ## Generate evaluation datasets
 
 Build evaluation tasks from collected true and false positive messages:

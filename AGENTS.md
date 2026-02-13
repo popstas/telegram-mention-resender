@@ -23,6 +23,7 @@ This project forwards Telegram messages that match specific rules to a target ch
 │   ├── trace_ids.py      # trace ID storage
 │   ├── telegram_utils.py # Telegram helpers
 │   ├── generate_evals.py # build eval datasets
+│   ├── bulk.py           # bulk operations CLI
 │   └── __init__.py       # marks package
 ├── tests/                # pytest suite
 ├── README.md             # setup instructions

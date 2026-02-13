@@ -221,9 +221,7 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
 
     monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
 
-    topics = [
-        config.FolderTopic(name="Topic", message="hello", username="@user")
-    ]
+    topics = [config.FolderTopic(name="Topic", message="hello", username="@user")]
     result = await tgu.add_topic_from_folders(["Folder"], topics)
 
     assert result == [(123, 101, "Chat")]
@@ -244,9 +242,7 @@ async def test_add_topic_from_folders_existing_topic_invites(monkeypatch):
 
     class DummyClient:
         def __init__(self):
-            self.topics: list = [
-                SimpleNamespace(id=1, title="Topic", top_message=101)
-            ]
+            self.topics: list = [SimpleNamespace(id=1, title="Topic", top_message=101)]
             self.invites: list = []
 
         async def get_entity(self, _):

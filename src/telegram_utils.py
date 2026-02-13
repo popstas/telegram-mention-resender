@@ -529,3 +529,26 @@ async def mute_chats_from_folders(folder_names: List[str]) -> None:
             continue
         for p in getattr(folder, "include_peers", []):
             await mute_peer_and_topics(p)
+
+
+async def add_user_to_folder_chats(folder_name: str, username: str) -> None:
+    """Add a user to all chats in a folder."""
+    if not folder_name or not username:
+        return
+    folders = await list_folders()
+    folder = await get_folder(folders, folder_name)
+    if not folder:
+        logger.error("Folder '%s' not found", folder_name)
+        return
+    for peer in getattr(folder, "include_peers", []) or []:
+        try:
+            channel = await client.get_entity(peer)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("Failed to get entity for peer %s: %s", peer, exc)
+            continue
+        chat_display = _format_chat_for_log(channel)
+        ok = await _add_user_to_channel(channel, username)
+        if ok:
+            logger.info("Added '%s' to %s", username, chat_display)
+        else:
+            logger.error("Failed to add '%s' to %s", username, chat_display)
