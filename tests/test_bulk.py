@@ -71,7 +71,50 @@ async def test_add_user_to_folder_chats(monkeypatch, caplog):
         await tgu.add_user_to_folder_chats("TestFolder", "@testuser")
 
     assert len(invited) == 2
-    assert any("@testuser" in record.message for record in caplog.records)
+    assert sum("Added" in r.message for r in caplog.records) == 2
+
+
+@pytest.mark.asyncio
+async def test_add_user_to_folder_chats_already_participant(monkeypatch, caplog):
+    from telethon import errors, functions
+
+    class DummyClient:
+        async def get_entity(self, peer):
+            return SimpleNamespace(id=peer.channel_id, title=f"Chat{peer.channel_id}")
+
+        async def get_input_entity(self, username):
+            return username
+
+        async def __call__(self, request):
+            if isinstance(request, functions.channels.GetParticipantRequest):
+                if request.channel.id == 2:
+                    return SimpleNamespace()  # user is participant
+                raise errors.UserNotParticipantError(request=None)
+            if isinstance(request, functions.channels.InviteToChannelRequest):
+                return SimpleNamespace()
+            raise AssertionError("Unexpected request")
+
+    monkeypatch.setattr(tgu, "client", DummyClient())
+
+    folder = SimpleNamespace(
+        title="F",
+        include_peers=[
+            SimpleNamespace(channel_id=1),
+            SimpleNamespace(channel_id=2),
+        ],
+    )
+
+    async def fake_list_folders():
+        return [folder]
+
+    monkeypatch.setattr(tgu, "list_folders", fake_list_folders)
+
+    with caplog.at_level("INFO"):
+        await tgu.add_user_to_folder_chats("F", "@user")
+
+    messages = [r.message for r in caplog.records]
+    assert sum("Added" in m for m in messages) == 1
+    assert sum("already a participant" in m for m in messages) == 1
 
 
 @pytest.mark.asyncio

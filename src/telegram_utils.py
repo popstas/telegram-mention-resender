@@ -368,29 +368,38 @@ async def _create_forum_topic(channel, title: str):
     return await _get_forum_topic_by_name(channel, title)
 
 
-async def _add_user_to_channel(channel, username: str) -> bool:
+async def _add_user_to_channel(channel, username: str) -> str:
+    """Add user to channel. Returns "added", "already", or "" on failure."""
     if not username:
-        return False
+        return ""
 
     chat_display = _format_chat_for_log(channel)
     try:
         user = await client.get_input_entity(username)
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Failed to resolve username '%s': %s", username, exc)
-        return False
+        return ""
 
     try:
-        await client(
+        result = await client(
             functions.channels.InviteToChannelRequest(channel=channel, users=[user])
         )
-        return True
-    except errors.UserAlreadyParticipantError:
+        missing = getattr(result, "missing_invitees", None) or []
+        if missing:
+            logger.warning(
+                "Could not add '%s' to %s: user's privacy settings prevent direct add",
+                username,
+                chat_display,
+            )
+            return "privacy"
+        return "added"
+    except (errors.UserAlreadyParticipantError, errors.UserAlreadyInvitedError):
         logger.debug(
             "Username '%s' is already a participant of %s",
             username,
             chat_display,
         )
-        return True
+        return "already"
     except Exception as exc:  # pylint: disable=broad-except
         logger.error(
             "Failed to add username '%s' to %s: %s",
@@ -398,7 +407,7 @@ async def _add_user_to_channel(channel, username: str) -> bool:
             chat_display,
             exc,
         )
-    return False
+    return ""
 
 
 async def add_topic_from_folders(
@@ -531,6 +540,20 @@ async def mute_chats_from_folders(folder_names: List[str]) -> None:
             await mute_peer_and_topics(p)
 
 
+async def _is_participant(channel, username: str) -> bool:
+    """Check if user is already a participant of the channel."""
+    try:
+        user = await client.get_input_entity(username)
+        await client(
+            functions.channels.GetParticipantRequest(channel=channel, participant=user)
+        )
+        return True
+    except errors.UserNotParticipantError:
+        return False
+    except Exception:  # pylint: disable=broad-except
+        return False
+
+
 async def add_user_to_folder_chats(folder_name: str, username: str) -> None:
     """Add a user to all chats in a folder."""
     if not folder_name or not username:
@@ -547,8 +570,11 @@ async def add_user_to_folder_chats(folder_name: str, username: str) -> None:
             logger.error("Failed to get entity for peer %s: %s", peer, exc)
             continue
         chat_display = _format_chat_for_log(channel)
-        ok = await _add_user_to_channel(channel, username)
-        if ok:
+        if await _is_participant(channel, username):
+            logger.info("'%s' is already a participant of %s", username, chat_display)
+            continue
+        result = await _add_user_to_channel(channel, username)
+        if result == "added":
             logger.info("Added '%s' to %s", username, chat_display)
-        else:
+        elif result != "privacy":
             logger.error("Failed to add '%s' to %s", username, chat_display)
