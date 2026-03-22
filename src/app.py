@@ -5,7 +5,13 @@ from typing import List
 from telethon import TelegramClient, events, types
 
 from . import langfuse_utils, prompts, telegram_utils
-from .config import Instance, get_api_credentials, load_config, load_instances
+from .config import (
+    Instance,
+    get_api_credentials,
+    load_config,
+    load_instances,
+    parse_proxy,
+)
 from .prompts import Prompt, match_prompt
 from .stats import stats as global_stats
 from .telegram_utils import (
@@ -263,7 +269,8 @@ async def main() -> None:
 
     api_id, api_hash, session_name = get_api_credentials(config)
 
-    client = TelegramClient(session_name, api_id, api_hash)
+    proxy = parse_proxy(config["proxy_url"]) if config.get("proxy_url") else None
+    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
     telegram_utils.client = client
     await client.start()
 

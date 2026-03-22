@@ -1,4 +1,5 @@
 telethon
+python-socks[asyncio]
 PyYAML
 black
 isort

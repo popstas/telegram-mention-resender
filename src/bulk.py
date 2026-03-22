@@ -13,7 +13,7 @@ from telethon import TelegramClient
 
 from . import telegram_utils
 from .app import setup_logging
-from .config import get_api_credentials, load_config
+from .config import get_api_credentials, load_config, parse_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,8 @@ async def run(args) -> None:
     setup_logging(config.get("log_level", "info"))
 
     api_id, api_hash, session_name = get_api_credentials(config)
-    client = TelegramClient(session_name, api_id, api_hash)
+    proxy = parse_proxy(config["proxy_url"]) if config.get("proxy_url") else None
+    client = TelegramClient(session_name, api_id, api_hash, proxy=proxy)
     telegram_utils.client = client
     await client.start()
 

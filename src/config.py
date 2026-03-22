@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import List, Optional, Set
+from urllib.parse import urlparse
 
 import yaml
 
@@ -38,6 +39,35 @@ class Instance:
     no_forward_message: bool = False
     prompts: List[Prompt] = field(default_factory=list)
     folder_add_topic: List[FolderTopic] = field(default_factory=list)
+
+
+def parse_proxy(proxy_url: str) -> Optional[tuple]:
+    """Parse a proxy URL into a Telethon-compatible proxy tuple.
+
+    Supported schemes: http, socks4, socks5.
+    Returns (proxy_type, host, port) or (proxy_type, host, port, True, user, pass).
+    """
+    import python_socks
+
+    scheme_map = {
+        "http": python_socks.ProxyType.HTTP,
+        "https": python_socks.ProxyType.HTTP,
+        "socks4": python_socks.ProxyType.SOCKS4,
+        "socks5": python_socks.ProxyType.SOCKS5,
+    }
+
+    parsed = urlparse(proxy_url)
+    scheme = (parsed.scheme or "").lower()
+    proxy_type = scheme_map.get(scheme)
+    if proxy_type is None:
+        raise ValueError(f"Unsupported proxy scheme: {scheme!r}")
+
+    host = parsed.hostname or ""
+    port = parsed.port or 1080
+
+    if parsed.username:
+        return (proxy_type, host, port, True, parsed.username, parsed.password or "")
+    return (proxy_type, host, port)
 
 
 def load_config() -> dict:

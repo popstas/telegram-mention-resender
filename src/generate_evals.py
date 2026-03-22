@@ -6,7 +6,7 @@ from typing import Iterable
 
 from telethon import TelegramClient
 
-from .config import get_api_credentials, load_config, load_instances
+from .config import get_api_credentials, load_config, load_instances, parse_proxy
 from .evals import get_eval_path
 from .telegram_utils import get_safe_name
 from .trace_ids import trace_ids
@@ -34,7 +34,8 @@ async def generate_evals(suffix: str, *, config_path: str | None = None) -> None
 
     config = load_config()
     api_id, api_hash, session = get_api_credentials(config)
-    client = TelegramClient(session, api_id, api_hash)
+    proxy = parse_proxy(config["proxy_url"]) if config.get("proxy_url") else None
+    client = TelegramClient(session, api_id, api_hash, proxy=proxy)
     await client.start()
 
     instances = await load_instances(config)

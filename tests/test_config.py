@@ -37,6 +37,39 @@ def test_config_path_env_override(tmp_path, monkeypatch):
     assert cfg_module.load_config() == {"bar": 2}
 
 
+def test_parse_proxy_socks5():
+    result = config.parse_proxy("socks5://127.0.0.1:1080")
+    import python_socks
+
+    assert result == (python_socks.ProxyType.SOCKS5, "127.0.0.1", 1080)
+
+
+def test_parse_proxy_http():
+    result = config.parse_proxy("http://proxy.example.com:8080")
+    import python_socks
+
+    assert result == (python_socks.ProxyType.HTTP, "proxy.example.com", 8080)
+
+
+def test_parse_proxy_with_auth():
+    result = config.parse_proxy("socks5://user:pass@127.0.0.1:1080")
+    import python_socks
+
+    assert result == (
+        python_socks.ProxyType.SOCKS5,
+        "127.0.0.1",
+        1080,
+        True,
+        "user",
+        "pass",
+    )
+
+
+def test_parse_proxy_unsupported_scheme():
+    with pytest.raises(ValueError, match="Unsupported proxy scheme"):
+        config.parse_proxy("ftp://127.0.0.1:21")
+
+
 @pytest.mark.asyncio
 async def test_load_instances_folder_add_topic():
     cfg = {
