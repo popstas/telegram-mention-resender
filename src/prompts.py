@@ -181,9 +181,14 @@ async def match_prompt(
             **params,
         )
         result = completion.choices[0].message.parsed
-        tokens = getattr(getattr(completion, "usage", None), "total_tokens", 0)
-        if inst_name and stats is not None:
-            stats.add_tokens(inst_name, tokens)
+        usage = getattr(completion, "usage", None)
+        if inst_name and stats is not None and usage is not None:
+            stats.add_tokens(
+                inst_name,
+                getattr(usage, "prompt_tokens", 0) or 0,
+                getattr(usage, "completion_tokens", 0) or 0,
+                total_tokens=getattr(usage, "total_tokens", None),
+            )
     except Exception as exc:  # pragma: no cover - external call
         logger.error("Failed to query OpenAI: %s", exc)
         result = MatchPromptResult(score=0, reasoning="", quote="", trace_id=None)

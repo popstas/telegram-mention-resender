@@ -59,7 +59,9 @@ forward those containing any of the specified words to their target chats.
 Statistics about processed messages are stored in `data/stats.json` and include
 overall, per-instance and per-day counters. Besides the total processed
 messages, the file tracks how many were forwarded in total, due to word matches
-or prompt matches, and the number of tokens consumed in each scope. Instances
+or prompt matches, and token usage in each scope: `input_tokens` (prompt),
+`output_tokens` (completion), and `tokens` (total from the API when available,
+otherwise the sum of input and output). Instances
 that use Telegram `folders` also get a `chats` field: a sorted list of normalized
 chat IDs currently resolved from those folders (updated on startup and on each
 folder rescan). If you have

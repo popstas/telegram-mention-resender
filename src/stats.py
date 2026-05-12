@@ -25,6 +25,8 @@ class Stats:
     forwarded_words: int = 0
     forwarded_prompt: int = 0
     tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "Stats":
@@ -35,6 +37,8 @@ class Stats:
             forwarded_words=data.get("forwarded_words", 0),
             forwarded_prompt=data.get("forwarded_prompt", 0),
             tokens=data.get("tokens", 0),
+            input_tokens=data.get("input_tokens", 0),
+            output_tokens=data.get("output_tokens", 0),
         )
 
     def to_dict(self) -> dict:
@@ -62,6 +66,8 @@ def convert(data: dict) -> dict:
             ).to_dict(),
             "days": {},
             "tokens": inst.get("tokens", 0),
+            "input_tokens": 0,
+            "output_tokens": 0,
         }
         for day, val in inst.get("days", {}).items():
             if isinstance(val, dict) and "stats" in val:
@@ -96,8 +102,17 @@ class StatsTracker:
             if inst.get("name") == name:
                 inst.setdefault("stats", Stats().to_dict())
                 inst.setdefault("tokens", 0)
+                inst.setdefault("input_tokens", 0)
+                inst.setdefault("output_tokens", 0)
                 return inst
-        inst = {"name": name, "stats": Stats().to_dict(), "days": {}, "tokens": 0}
+        inst = {
+            "name": name,
+            "stats": Stats().to_dict(),
+            "days": {},
+            "tokens": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        }
         self.data.setdefault("instances", []).append(inst)
         return inst
 
@@ -123,15 +138,34 @@ class StatsTracker:
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()
 
-    def add_tokens(self, name: str, tokens: int) -> None:
-        if tokens <= 0:
+    def add_tokens(
+        self,
+        name: str,
+        input_tokens: int,
+        output_tokens: int,
+        *,
+        total_tokens: int | None = None,
+    ) -> None:
+        in_t = max(0, input_tokens)
+        out_t = max(0, output_tokens)
+        tot = total_tokens if total_tokens is not None else None
+        if tot is not None:
+            tot = max(0, tot)
+        if in_t <= 0 and out_t <= 0 and (tot is None or tot <= 0):
+            return
+        delta_total = tot if tot is not None and tot > 0 else in_t + out_t
+        if delta_total <= 0:
             return
         inst = self._get_inst(name)
         day = current_day()
         day_stat = inst["days"].setdefault(day, {"stats": Stats().to_dict()})
         for scope in (self.data["stats"], inst["stats"], day_stat["stats"]):
-            scope["tokens"] = scope.get("tokens", 0) + tokens
-        inst["tokens"] = inst.get("tokens", 0) + tokens
+            scope["input_tokens"] = scope.get("input_tokens", 0) + in_t
+            scope["output_tokens"] = scope.get("output_tokens", 0) + out_t
+            scope["tokens"] = scope.get("tokens", 0) + delta_total
+        inst["input_tokens"] = inst.get("input_tokens", 0) + in_t
+        inst["output_tokens"] = inst.get("output_tokens", 0) + out_t
+        inst["tokens"] = inst.get("tokens", 0) + delta_total
         self.dirty = True
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()

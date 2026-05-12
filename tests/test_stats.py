@@ -9,12 +9,14 @@ def test_stats_increment_and_flush(tmp_path):
     tracker.increment("a", forwarded=True, used_word=True)
     tracker.increment("a", forwarded=True, used_prompt=True)
     tracker.increment("b")
-    tracker.add_tokens("a", 10)
-    tracker.add_tokens("b", 5)
+    tracker.add_tokens("a", 4, 6, total_tokens=10)
+    tracker.add_tokens("b", 2, 3, total_tokens=5)
     tracker.flush()
     data = json.loads(path.read_text())
     assert data["stats"]["total"] == 3
     assert data["stats"]["tokens"] == 15
+    assert data["stats"]["input_tokens"] == 6
+    assert data["stats"]["output_tokens"] == 9
     assert data["stats"]["forwarded_total"] == 2
     assert data["stats"]["forwarded_words"] == 1
     assert data["stats"]["forwarded_prompt"] == 1
@@ -24,6 +26,14 @@ def test_stats_increment_and_flush(tmp_path):
     assert inst_b["stats"]["total"] == 1
     assert inst_a["stats"]["tokens"] == 10
     assert inst_b["stats"]["tokens"] == 5
+    assert inst_a["stats"]["input_tokens"] == 4
+    assert inst_a["stats"]["output_tokens"] == 6
+    assert inst_b["stats"]["input_tokens"] == 2
+    assert inst_b["stats"]["output_tokens"] == 3
+    assert inst_a["input_tokens"] == 4
+    assert inst_a["output_tokens"] == 6
+    assert inst_b["input_tokens"] == 2
+    assert inst_b["output_tokens"] == 3
     assert inst_a["stats"]["forwarded_total"] == 2
     assert inst_a["stats"]["forwarded_words"] == 1
     assert inst_a["stats"]["forwarded_prompt"] == 1
@@ -33,6 +43,8 @@ def test_stats_increment_and_flush(tmp_path):
     assert inst_a["days"][day]["stats"]["forwarded_words"] == 1
     assert inst_a["days"][day]["stats"]["forwarded_prompt"] == 1
     assert inst_a["days"][day]["stats"]["tokens"] == 10
+    assert inst_a["days"][day]["stats"]["input_tokens"] == 4
+    assert inst_a["days"][day]["stats"]["output_tokens"] == 6
 
 
 def test_convert_old_format():
@@ -45,10 +57,14 @@ def test_convert_old_format():
     }
     new = stats_module.convert(old)
     assert new["stats"]["total"] == 1
+    assert new["stats"].get("input_tokens", 0) == 0
+    assert new["stats"].get("output_tokens", 0) == 0
     inst = new["instances"][0]
     assert inst["name"] == "a"
     assert inst["stats"]["total"] == 1
     assert inst["stats"]["tokens"] == 2
+    assert inst["stats"].get("input_tokens", 0) == 0
+    assert inst["stats"].get("output_tokens", 0) == 0
     assert inst["days"]["2024-01-01"]["stats"]["total"] == 1
 
 
