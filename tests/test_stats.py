@@ -50,3 +50,26 @@ def test_convert_old_format():
     assert inst["stats"]["total"] == 1
     assert inst["stats"]["tokens"] == 2
     assert inst["days"]["2024-01-01"]["stats"]["total"] == 1
+
+
+def test_folder_chats_set_and_clear(tmp_path):
+    path = tmp_path / "stats.json"
+    tracker = stats_module.StatsTracker(str(path), flush_interval=0)
+    tracker.set_folder_chats("a", [-200, -100])
+    tracker.flush()
+    data = json.loads(path.read_text())
+    inst_a = next(i for i in data["instances"] if i["name"] == "a")
+    assert inst_a["chats"] == [-200, -100]
+
+    tracker.clear_folder_chats("a")
+    tracker.flush()
+    data = json.loads(path.read_text())
+    inst_a = next(i for i in data["instances"] if i["name"] == "a")
+    assert "chats" not in inst_a
+
+
+def test_clear_folder_chats_unknown_instance(tmp_path):
+    path = tmp_path / "stats.json"
+    tracker = stats_module.StatsTracker(str(path), flush_interval=0)
+    tracker.clear_folder_chats("nonexistent")
+    assert tracker.data["instances"] == []

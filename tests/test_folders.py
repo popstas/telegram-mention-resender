@@ -1,10 +1,11 @@
-import asyncio
+import builtins
 from types import SimpleNamespace
 
 import pytest
 
 import src.app as app
 import src.config as config
+import src.stats as stats_module
 import src.telegram_utils as tgu
 
 
@@ -53,7 +54,7 @@ async def test_get_folders_chat_ids(monkeypatch, dummy_folder_peers_cls):
 
 
 @pytest.mark.asyncio
-async def test_update_instance_chat_ids(monkeypatch):
+async def test_update_instance_chat_ids(monkeypatch, tmp_path):
     async def fake_get_folders_chat_ids(folders):
         assert folders == ["f"]
         return {5}
@@ -79,6 +80,11 @@ async def test_update_instance_chat_ids(monkeypatch):
     monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
     monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
     monkeypatch.setattr(app, "add_topic_from_folders", fake_add_topics)
+    monkeypatch.setattr(builtins, "exit", lambda *a, **k: None)
+
+    stats_path = tmp_path / "stats.json"
+    folder_stats = stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    monkeypatch.setattr(app, "stats", folder_stats)
 
     inst = app.Instance(
         name="i",
@@ -93,10 +99,12 @@ async def test_update_instance_chat_ids(monkeypatch):
     await app.update_instance_chat_ids(inst, True)
     assert inst.chat_ids == {-4, -5, -6}
     assert added_topics == [(["f"], inst.folder_add_topic)]
+    inst_row = next(i for i in folder_stats.data["instances"] if i["name"] == "i")
+    assert inst_row["chats"] == [-5]
 
 
 @pytest.mark.asyncio
-async def test_update_instance_chat_ids_mute(monkeypatch):
+async def test_update_instance_chat_ids_mute(monkeypatch, tmp_path):
     async def fake_get_folders_chat_ids(folders):
         return set()
 
@@ -112,12 +120,57 @@ async def test_update_instance_chat_ids_mute(monkeypatch):
     monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
     monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
     monkeypatch.setattr(app, "mute_chats_from_folders", fake_mute)
+    monkeypatch.setattr(builtins, "exit", lambda *a, **k: None)
+
+    stats_path = tmp_path / "stats.json"
+    folder_stats = stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    monkeypatch.setattr(app, "stats", folder_stats)
 
     inst = app.Instance(
         name="i", words=[], target_chat=0, folders=["f"], folder_mute=True
     )
     await app.update_instance_chat_ids(inst, True)
     assert called == [["f"]]
+    inst_row = next(i for i in folder_stats.data["instances"] if i["name"] == "i")
+    assert inst_row["chats"] == []
+
+
+@pytest.mark.asyncio
+async def test_update_instance_chat_ids_no_folders_clears_chats(monkeypatch, tmp_path):
+    async def fake_get_folders_chat_ids(folders):
+        assert folders == []
+        return set()
+
+    async def fake_resolve_entities(entities):
+        return set()
+
+    async def fake_get_input_entity(cid):
+        from telethon import types
+
+        return types.InputPeerChat(cid)
+
+    monkeypatch.setattr(
+        tgu, "client", SimpleNamespace(get_input_entity=fake_get_input_entity)
+    )
+    monkeypatch.setattr(app, "get_folders_chat_ids", fake_get_folders_chat_ids)
+    monkeypatch.setattr(app, "resolve_entities", fake_resolve_entities)
+
+    stats_path = tmp_path / "stats.json"
+    folder_stats = stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    folder_stats.set_folder_chats("nof", [-99])
+    monkeypatch.setattr(app, "stats", folder_stats)
+
+    inst = app.Instance(
+        name="nof",
+        words=[],
+        target_chat=0,
+        folders=[],
+        chat_ids={3},
+        entities=[],
+    )
+    await app.update_instance_chat_ids(inst, True)
+    inst_row = next(i for i in folder_stats.data["instances"] if i["name"] == "nof")
+    assert "chats" not in inst_row
 
 
 @pytest.mark.asyncio

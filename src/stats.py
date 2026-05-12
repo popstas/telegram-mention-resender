@@ -136,6 +136,23 @@ class StatsTracker:
         if time.monotonic() - self.last_flush >= self.flush_interval:
             self.flush()
 
+    def set_folder_chats(self, name: str, chat_ids: list[int]) -> None:
+        """Store normalized folder chat IDs for an instance (sibling of per-instance stats)."""
+        inst = self._get_inst(name)
+        inst["chats"] = chat_ids
+        self.dirty = True
+        if time.monotonic() - self.last_flush >= self.flush_interval:
+            self.flush()
+
+    def clear_folder_chats(self, name: str) -> None:
+        """Remove folder chat list for an instance when it no longer uses folders."""
+        for inst in self.data.get("instances", []):
+            if inst.get("name") == name and inst.pop("chats", None) is not None:
+                self.dirty = True
+                if time.monotonic() - self.last_flush >= self.flush_interval:
+                    self.flush()
+                break
+
     def flush(self) -> None:
         if not self.dirty:
             return

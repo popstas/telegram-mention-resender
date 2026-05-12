@@ -64,7 +64,14 @@ def setup_logging(level: str = "info") -> None:
 
 async def update_instance_chat_ids(instance: Instance, first_run: bool = False) -> None:
     """Refresh chat IDs for a single instance."""
-    new_ids = await get_folders_chat_ids(instance.folders)
+    folder_ids_raw = await get_folders_chat_ids(instance.folders)
+    if instance.folders:
+        folder_only = await normalize_chat_ids(set(folder_ids_raw))
+        stats.set_folder_chats(instance.name, sorted(folder_only))
+    else:
+        stats.clear_folder_chats(instance.name)
+
+    new_ids = set(folder_ids_raw)
     new_ids.update(instance.chat_ids)
     new_ids.update(await resolve_entities(instance.entities))
     instance.chat_ids = await normalize_chat_ids(new_ids)
