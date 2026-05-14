@@ -172,6 +172,57 @@ async def test_process_message_prompt(monkeypatch, dummy_message_cls, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_process_message_target_webhook(monkeypatch, dummy_message_cls, tmp_path):
+    sent = []
+
+    class DummyClient:
+        async def send_message(self, *a, **k):
+            sent.append((a, k))
+
+    app.client = DummyClient()
+    tgu.client = app.client
+    app.stats = stats_module.StatsTracker(
+        str(tmp_path / "stats.json"), flush_interval=0
+    )
+
+    target_webhook = config_module.TargetWebhook(
+        url="http://localhost:8002/hook", format="json"
+    )
+    inst = app.Instance(
+        name="w",
+        words=["hi"],
+        target_chat=1,
+        target_webhook=target_webhook,
+    )
+
+    called = []
+
+    async def fake_send_webhook(target, message):
+        called.append((target, message))
+
+    monkeypatch.setattr(app.webhook, "send_webhook", fake_send_webhook)
+
+    async def fake_get_message_source(msg):
+        return "src"
+
+    async def fake_get_chat_name(v, safe=False):
+        return "n"
+
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    monkeypatch.setattr(app, "get_chat_name", fake_get_chat_name)
+
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=9, text="hi")
+    event = SimpleNamespace(message=msg, chat_id=1)
+    await app.process_message(inst, event)
+
+    assert msg.forwarded == [1]
+    assert len(called) == 1
+    assert called[0][0] is target_webhook
+    assert called[0][1] is msg
+
+
+@pytest.mark.asyncio
 async def test_process_message_no_forward_message(
     monkeypatch, dummy_message_cls, tmp_path
 ):
@@ -338,7 +389,7 @@ async def test_false_positive_reaction(monkeypatch, dummy_message_cls):
         peer=tgu.types.PeerChannel(77),
         msg_id=5,
         reactions=tgu.types.MessageReactions(
-            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001F44E"), 1)]
+            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001f44e"), 1)]
         ),
     )
 
@@ -383,7 +434,7 @@ async def test_negative_reaction_twice(monkeypatch, dummy_message_cls):
         peer=tgu.types.PeerChannel(77),
         msg_id=5,
         reactions=tgu.types.MessageReactions(
-            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001F44E"), 1)]
+            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001f44e"), 1)]
         ),
     )
 
@@ -426,7 +477,7 @@ async def test_true_positive_reaction(monkeypatch, dummy_message_cls):
         peer=tgu.types.PeerChannel(77),
         msg_id=5,
         reactions=tgu.types.MessageReactions(
-            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001F44D"), 1)]
+            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001f44d"), 1)]
         ),
     )
 
@@ -470,7 +521,7 @@ async def test_positive_reaction_twice(monkeypatch, dummy_message_cls):
         peer=tgu.types.PeerChannel(77),
         msg_id=5,
         reactions=tgu.types.MessageReactions(
-            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001F44D"), 1)]
+            results=[tgu.types.ReactionCount(tgu.types.ReactionEmoji("\U0001f44d"), 1)]
         ),
     )
 

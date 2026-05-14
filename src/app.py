@@ -4,7 +4,7 @@ from typing import List
 
 from telethon import TelegramClient, events, types
 
-from . import langfuse_utils, prompts, telegram_utils
+from . import langfuse_utils, prompts, telegram_utils, webhook
 from .config import (
     Instance,
     get_api_credentials,
@@ -181,6 +181,8 @@ async def process_message(inst: Instance, event: events.NewMessage.Event) -> Non
                     inst.name,
                     f_url,
                 )
+            if inst.target_webhook is not None:
+                await webhook.send_webhook(inst.target_webhook, message)
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("Failed to forward message: %s", exc)
     else:

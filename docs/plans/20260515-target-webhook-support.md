@@ -51,14 +51,14 @@ Add a per-instance `target_webhook` configuration option that, when set, causes 
 
 ### Task 2: Implement webhook delivery in the message handler
 
-- [ ] add a `send_webhook(instance, message, context)` helper (text and json branches) — place near the forward block in `src/app.py` or in a new `src/webhook.py` if it grows
-- [ ] format `text` payload as a single line: `From: @user, Name: <full_name>, Message: <text>`
-- [ ] format `json` payload with `from_username`, `from_name`, `message_text`, `chat_id`, `message_id`, `message_url`, `timestamp`
-- [ ] call the helper from the forward branch in `src/app.py` when `inst.target_webhook` is set; do not skip existing `target_chat` / `target_entity` delivery
-- [ ] wrap the POST in try/except so a webhook failure logs but never raises out of the handler
-- [ ] use a short request timeout (10s) and log non-2xx responses
-- [ ] write tests for new functionality (text payload formatting, json payload formatting, network error is swallowed and logged)
-- [ ] run project tests - must pass before next task
+- [x] add a `send_webhook(instance, message, context)` helper (text and json branches) — place near the forward block in `src/app.py` or in a new `src/webhook.py` if it grows
+- [x] format `text` payload as a single line: `From: @user, Name: <full_name>, Message: <text>`
+- [x] format `json` payload with `from_username`, `from_name`, `message_text`, `chat_id`, `message_id`, `message_url`, `timestamp`
+- [x] call the helper from the forward branch in `src/app.py` when `inst.target_webhook` is set; do not skip existing `target_chat` / `target_entity` delivery
+- [x] wrap the POST in try/except so a webhook failure logs but never raises out of the handler
+- [x] use a short request timeout (10s) and log non-2xx responses
+- [x] write tests for new functionality (text payload formatting, json payload formatting, network error is swallowed and logged)
+- [x] run project tests - must pass before next task
 
 ### Task 3: Standalone test webhook server
 
