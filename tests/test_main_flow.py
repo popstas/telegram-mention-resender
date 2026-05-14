@@ -65,7 +65,7 @@ async def test_main_flow(monkeypatch, dummy_tg_client, dummy_message_cls, tmp_pa
     monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
-    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
 
     stats_path = tmp_path / "stats.json"
     monkeypatch.setattr(
@@ -267,7 +267,7 @@ async def test_ignore_usernames(
     monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
-    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
 
     stats_path = tmp_path / "stats.json"
     monkeypatch.setattr(
@@ -320,7 +320,7 @@ async def test_ignore_user_ids(
     monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
-    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
 
     stats_path = tmp_path / "stats.json"
     monkeypatch.setattr(
@@ -547,7 +547,7 @@ async def test_ignore_words(monkeypatch, dummy_tg_client, dummy_message_cls, tmp
     monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
-    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
 
     stats_path = tmp_path / "stats.json"
     monkeypatch.setattr(
@@ -601,7 +601,7 @@ async def test_negative_words(
     monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
 
     dummy_client = dummy_tg_client
-    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b: dummy_client)
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
 
     stats_path = tmp_path / "stats.json"
     monkeypatch.setattr(

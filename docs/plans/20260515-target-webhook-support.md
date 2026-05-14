@@ -80,9 +80,9 @@ Add a per-instance `target_webhook` configuration option that, when set, causes 
 
 ### Task 5: Verify acceptance criteria
 
-- [ ] verify all requirements from Overview are implemented (per-instance `target_webhook`, text and json formats, named instance keeps working)
-- [ ] run full project test suite (`pytest`)
-- [ ] run project linter — `pre-commit run --all-files` — all issues must be fixed
+- [x] verify all requirements from Overview are implemented (per-instance `target_webhook`, text and json formats, named instance keeps working)
+- [x] run full project test suite (`pytest`) — webhook tests all pass (test_webhook.py 8/8, test_webhook_server_script.py 2/2); fixed 5 pre-existing `test_main_flow.py` mock failures by adding `proxy=None` kwarg to `TelegramClient` lambdas; 2 remaining failures in `test_folders.py` are a pre-existing telethon-version incompatibility (`GetForumTopicsRequest` removed in telethon 1.42.0) unrelated to webhook work
+- [x] run project linter — `pre-commit run --all-files` — all issues must be fixed (black + isort passed)
 
 ## Post-Completion
 
