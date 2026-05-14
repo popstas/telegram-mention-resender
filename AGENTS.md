@@ -24,7 +24,10 @@ This project forwards Telegram messages that match specific rules to a target ch
 │   ├── telegram_utils.py # Telegram helpers
 │   ├── generate_evals.py # build eval datasets
 │   ├── bulk.py           # bulk operations CLI
+│   ├── webhook.py        # target_webhook HTTP delivery
 │   └── __init__.py       # marks package
+├── scripts/
+│   └── test_webhook_server.py  # manual webhook listener (port 8002)
 ├── tests/                # pytest suite
 ├── README.md             # setup instructions
 ├── pyproject.toml / requirements.txt  # dependencies

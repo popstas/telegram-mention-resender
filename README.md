@@ -39,7 +39,7 @@ pip install -r requirements.txt
 - `ignore_user_ids` – list of user IDs to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `negative_words`, `ignore_words`, `target_chat`,
-  `target_entity`, `folder_mute`, `folder_add_topic`, `false_positive_entity`, `true_positive_entity`
+  `target_entity`, `target_webhook`, `folder_mute`, `folder_add_topic`, `false_positive_entity`, `true_positive_entity`
   and `no_forward_message`.
 
 `folder_add_topic` is a list of topics that should exist in every chat inside the
@@ -83,6 +83,42 @@ python -m src.bulk --folder MyFolder --add-user @username
 # Combine actions
 python -m src.bulk --folder MyFolder --mute --add-user @username
 ```
+
+## Webhook delivery (`target_webhook`)
+
+In addition to forwarding matched messages to a Telegram chat, an instance can
+POST each match to an HTTP endpoint. This runs alongside the existing
+`target_chat` / `target_entity` delivery — it does not replace it. Webhook
+failures are logged and swallowed, so they never block Telegram forwarding or
+raise out of the handler. Requests use a short 10-second timeout and non-2xx
+responses are logged.
+
+Configure it under any instance:
+
+```yaml
+instances:
+  - name: Example (text)
+    words: [hello]
+    target_webhook:
+      url: http://127.0.0.1:8002/webhook
+      format: text   # default
+
+  - name: Example (json)
+    words: [hello]
+    target_webhook:
+      url: http://127.0.0.1:8002/webhook
+      format: json
+```
+
+Payload formats:
+
+- `text` (default): one line, e.g.
+  `From: @user, Name: John Doe, Message: Hello, how are you?`
+- `json`: an object with `from_username`, `from_name`, `message_text`,
+  `chat_id`, `message_id`, `message_url`, `timestamp`.
+
+Only `text` and `json` are accepted; any other value is rejected at config
+load time.
 
 ## Manual webhook testing
 

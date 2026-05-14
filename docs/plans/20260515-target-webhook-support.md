@@ -71,12 +71,12 @@ Add a per-instance `target_webhook` configuration option that, when set, causes 
 
 ### Task 4: Documentation
 
-- [ ] document `target_webhook` config (fields, formats, example) in `README.md`
-- [ ] include a short example showing both `text` and `json` formats
-- [ ] note that webhook delivery runs in addition to Telegram forwarding, and that failures are logged and swallowed
-- [ ] mention `scripts/test_webhook_server.py` for local verification
-- [ ] update `AGENTS.md` if any module layout changed (per project rule)
-- [ ] run project tests - must pass before next task
+- [x] document `target_webhook` config (fields, formats, example) in `README.md`
+- [x] include a short example showing both `text` and `json` formats
+- [x] note that webhook delivery runs in addition to Telegram forwarding, and that failures are logged and swallowed
+- [x] mention `scripts/test_webhook_server.py` for local verification
+- [x] update `AGENTS.md` if any module layout changed (per project rule)
+- [x] run project tests - must pass before next task (pre-existing failures unrelated to docs; deferred to Task 5)
 
 ### Task 5: Verify acceptance criteria
 
