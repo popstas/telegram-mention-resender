@@ -239,10 +239,10 @@ async def test_add_topic_from_folders(monkeypatch, caplog):
             return username
 
         async def __call__(self, request):
-            if isinstance(request, functions.channels.GetForumTopicsRequest):
+            if isinstance(request, functions.messages.GetForumTopicsRequest):
                 matches = [t for t in self.topics if t.title == request.q]
                 return SimpleNamespace(topics=matches)
-            if isinstance(request, functions.channels.CreateForumTopicRequest):
+            if isinstance(request, functions.messages.CreateForumTopicRequest):
                 topic_id = len(self.topics) + 1
                 topic = SimpleNamespace(
                     id=topic_id, title=request.title, top_message=topic_id + 100
@@ -312,7 +312,7 @@ async def test_add_topic_from_folders_existing_topic_invites(monkeypatch):
             return username
 
         async def __call__(self, request):
-            if isinstance(request, functions.channels.GetForumTopicsRequest):
+            if isinstance(request, functions.messages.GetForumTopicsRequest):
                 matches = [t for t in self.topics if t.title == request.q]
                 return SimpleNamespace(topics=matches)
             if isinstance(request, functions.channels.InviteToChannelRequest):

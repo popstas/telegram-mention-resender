@@ -332,8 +332,8 @@ async def _get_forum_topic_by_name(channel, title: str):
     chat_display = _format_chat_for_log(channel)
     try:
         result = await client(
-            functions.channels.GetForumTopicsRequest(
-                channel=channel,
+            functions.messages.GetForumTopicsRequest(
+                peer=channel,
                 offset_date=0,
                 offset_id=0,
                 offset_topic=0,
@@ -355,7 +355,7 @@ async def _create_forum_topic(channel, title: str):
     chat_display = _format_chat_for_log(channel)
     try:
         await client(
-            functions.channels.CreateForumTopicRequest(channel=channel, title=title)
+            functions.messages.CreateForumTopicRequest(peer=channel, title=title)
         )
     except Exception as exc:  # pylint: disable=broad-except
         logger.error(
