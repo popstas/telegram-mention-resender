@@ -41,13 +41,13 @@ Add a per-instance `target_webhook` configuration option that, when set, causes 
 
 ### Task 1: Extend config schema for target_webhook
 
-- [ ] add `TargetWebhook` dataclass with `url: str` and `format: str = "text"` to `src/config.py`
-- [ ] add `target_webhook: TargetWebhook | None = None` field to the `Instance` dataclass
-- [ ] parse `target_webhook` in the config loader, including format validation (`text` or `json` only)
-- [ ] update `generateConfig` (or example-config builder) so `target_webhook` is reflected in the generated example
-- [ ] add `target_webhook` example under the `default` instance in `config-example.yml`
-- [ ] write tests for new functionality (config loading, defaults, invalid format rejection)
-- [ ] run project tests - must pass before next task
+- [x] add `TargetWebhook` dataclass with `url: str` and `format: str = "text"` to `src/config.py`
+- [x] add `target_webhook: TargetWebhook | None = None` field to the `Instance` dataclass
+- [x] parse `target_webhook` in the config loader, including format validation (`text` or `json` only)
+- [x] update `generateConfig` (or example-config builder) so `target_webhook` is reflected in the generated example
+- [x] add `target_webhook` example under the `default` instance in `config-example.yml`
+- [x] write tests for new functionality (config loading, defaults, invalid format rejection)
+- [x] run project tests - must pass before next task
 
 ### Task 2: Implement webhook delivery in the message handler
 

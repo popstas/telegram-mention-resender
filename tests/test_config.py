@@ -71,6 +71,78 @@ def test_parse_proxy_unsupported_scheme():
 
 
 @pytest.mark.asyncio
+async def test_load_instances_target_webhook_text_default():
+    cfg = {
+        "instances": [
+            {
+                "name": "inst",
+                "words": [],
+                "target_webhook": {"url": "http://localhost:8002/hook"},
+            }
+        ]
+    }
+    instances = await config.load_instances(cfg)
+    assert instances[0].target_webhook is not None
+    assert instances[0].target_webhook.url == "http://localhost:8002/hook"
+    assert instances[0].target_webhook.format == "text"
+
+
+@pytest.mark.asyncio
+async def test_load_instances_target_webhook_json():
+    cfg = {
+        "instances": [
+            {
+                "name": "inst",
+                "words": [],
+                "target_webhook": {
+                    "url": "http://localhost:8002/hook",
+                    "format": "json",
+                },
+            }
+        ]
+    }
+    instances = await config.load_instances(cfg)
+    assert instances[0].target_webhook.format == "json"
+
+
+@pytest.mark.asyncio
+async def test_load_instances_target_webhook_invalid_format():
+    cfg = {
+        "instances": [
+            {
+                "name": "inst",
+                "words": [],
+                "target_webhook": {"url": "http://x", "format": "xml"},
+            }
+        ]
+    }
+    with pytest.raises(ValueError, match="target_webhook.format"):
+        await config.load_instances(cfg)
+
+
+@pytest.mark.asyncio
+async def test_load_instances_target_webhook_missing_url():
+    cfg = {
+        "instances": [
+            {
+                "name": "inst",
+                "words": [],
+                "target_webhook": {"format": "text"},
+            }
+        ]
+    }
+    with pytest.raises(ValueError, match="target_webhook.url"):
+        await config.load_instances(cfg)
+
+
+@pytest.mark.asyncio
+async def test_load_instances_target_webhook_absent_defaults_to_none():
+    cfg = {"instances": [{"name": "inst", "words": []}]}
+    instances = await config.load_instances(cfg)
+    assert instances[0].target_webhook is None
+
+
+@pytest.mark.asyncio
 async def test_load_instances_folder_add_topic():
     cfg = {
         "instances": [

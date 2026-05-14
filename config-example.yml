@@ -38,5 +38,10 @@ instances:
         #   temperature: 0.7
     target_chat: 0
     target_entity: ""
+    # Optional: POST matched messages to an HTTP endpoint.
+    # format: "text" (single line) or "json" (object with metadata).
+    # target_webhook:
+    #   url: http://127.0.0.1:8002/webhook
+    #   format: text
     false_positive_entity: ""
     true_positive_entity: ""
