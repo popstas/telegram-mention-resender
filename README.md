@@ -128,8 +128,8 @@ incoming request (method, headers, body) to stdout, and responds with
 `200 OK` and a small JSON ack:
 
 ```bash
-python scripts/test_webhook_server.py            # listens on 0.0.0.0:8002
-python scripts/test_webhook_server.py --port 9000
+python scripts/test_webhook_server.py            # listens on 127.0.0.1:8002
+python scripts/test_webhook_server.py --host 0.0.0.0 --port 9000
 ```
 
 Point an instance's `target_webhook.url` at `http://localhost:8002/` (or any

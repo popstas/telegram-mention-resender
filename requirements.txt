@@ -1,6 +1,7 @@
 telethon
 python-socks[asyncio]
 PyYAML
+httpx
 black
 isort
 pytest

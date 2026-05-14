@@ -105,5 +105,5 @@ async def send_webhook(target: TargetWebhook, message: Any) -> None:
                 response.status_code,
                 response.text[:500],
             )
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.error("Webhook delivery to %s failed: %s", target.url, exc)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("Webhook delivery to %s failed", target.url)
