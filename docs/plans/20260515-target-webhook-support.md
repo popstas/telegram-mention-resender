@@ -62,12 +62,12 @@ Add a per-instance `target_webhook` configuration option that, when set, causes 
 
 ### Task 3: Standalone test webhook server
 
-- [ ] add `scripts/test_webhook_server.py` — a tiny stdlib `http.server` (or `aiohttp.web`) listener on port 8002
-- [ ] log each incoming request's method, headers, and decoded body to stdout
-- [ ] respond with `200 OK` and a short JSON ack
-- [ ] document how to run it in the README (manual testing section)
-- [ ] write tests for new functionality (smoke test: launch server in a thread, POST text and json, assert it returns 200 and prints the body)
-- [ ] run project tests - must pass before next task
+- [x] add `scripts/test_webhook_server.py` — a tiny stdlib `http.server` (or `aiohttp.web`) listener on port 8002
+- [x] log each incoming request's method, headers, and decoded body to stdout
+- [x] respond with `200 OK` and a short JSON ack
+- [x] document how to run it in the README (manual testing section)
+- [x] write tests for new functionality (smoke test: launch server in a thread, POST text and json, assert it returns 200 and prints the body)
+- [x] run project tests - must pass before next task
 
 ### Task 4: Documentation
 

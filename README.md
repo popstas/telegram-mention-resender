@@ -84,6 +84,21 @@ python -m src.bulk --folder MyFolder --add-user @username
 python -m src.bulk --folder MyFolder --mute --add-user @username
 ```
 
+## Manual webhook testing
+
+A tiny HTTP listener is provided for manual end-to-end testing of an
+instance's `target_webhook`. It binds to port 8002 by default, prints every
+incoming request (method, headers, body) to stdout, and responds with
+`200 OK` and a small JSON ack:
+
+```bash
+python scripts/test_webhook_server.py            # listens on 0.0.0.0:8002
+python scripts/test_webhook_server.py --port 9000
+```
+
+Point an instance's `target_webhook.url` at `http://localhost:8002/` (or any
+path) and trigger a matching Telegram message to confirm delivery.
+
 ## Generate evaluation datasets
 
 Build evaluation tasks from collected true and false positive messages:
