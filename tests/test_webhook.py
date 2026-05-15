@@ -157,6 +157,49 @@ async def test_send_webhook_swallows_network_error(monkeypatch, caplog):
 
 
 @pytest.mark.asyncio
+async def test_send_webhook_resolves_lazy_sender(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            captured["kwargs"] = kwargs
+            return FakeResponse()
+
+    monkeypatch.setattr(webhook.httpx, "AsyncClient", FakeClient)
+
+    msg = _make_message(sender=None)
+
+    async def fake_get_sender():
+        msg.sender = SimpleNamespace(
+            username="lazyuser", first_name="Lazy", last_name="User"
+        )
+        return msg.sender
+
+    msg.get_sender = fake_get_sender
+
+    target = TargetWebhook(url="http://localhost:8002/hook", format="text")
+    await webhook.send_webhook(target, msg)
+
+    assert (
+        captured["kwargs"]["content"]
+        == b"From: @lazyuser, Name: Lazy User, Message: Hello, how are you?"
+    )
+
+
+@pytest.mark.asyncio
 async def test_send_webhook_logs_non_2xx(monkeypatch, caplog):
     class FakeResponse:
         status_code = 500

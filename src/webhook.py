@@ -81,12 +81,26 @@ def format_json_payload(message: Any) -> dict:
     }
 
 
+async def _ensure_sender_loaded(message: Any) -> None:
+    """Force Telethon to resolve ``message.sender`` if it's lazy-loaded."""
+    if getattr(message, "sender", None) is not None:
+        return
+    getter = getattr(message, "get_sender", None)
+    if not callable(getter):
+        return
+    try:
+        await getter()
+    except Exception:  # pylint: disable=broad-except
+        logger.debug("Failed to resolve sender for webhook payload", exc_info=True)
+
+
 async def send_webhook(target: TargetWebhook, message: Any) -> None:
     """POST ``message`` to ``target.url`` using ``target.format``.
 
     Failures are logged and swallowed so the caller's flow is never broken.
     """
     try:
+        await _ensure_sender_loaded(message)
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             if target.format == "json":
                 response = await client.post(
