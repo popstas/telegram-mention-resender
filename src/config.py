@@ -21,6 +21,14 @@ class FolderTopic:
 
 
 @dataclass
+class TargetWebhook:
+    """Configuration for forwarding matched messages to an HTTP webhook."""
+
+    url: str
+    format: str = "text"
+
+
+@dataclass
 class Instance:
     """Configuration for a single monitoring instance."""
 
@@ -30,6 +38,7 @@ class Instance:
     ignore_words: List[str] = field(default_factory=list)
     target_chat: int | None = None
     target_entity: str | None = None
+    target_webhook: TargetWebhook | None = None
     false_positive_entity: str | None = None
     true_positive_entity: str | None = None
     folders: List[str] = field(default_factory=list)
@@ -148,6 +157,21 @@ async def load_instances(config: dict) -> List[Instance]:
                 )
             )
 
+        target_webhook_cfg = inst_cfg.get("target_webhook")
+        target_webhook: TargetWebhook | None = None
+        if isinstance(target_webhook_cfg, dict):
+            url = target_webhook_cfg.get("url")
+            if not url:
+                raise ValueError(
+                    "target_webhook.url is required when target_webhook is set"
+                )
+            fmt = target_webhook_cfg.get("format", "text")
+            if fmt not in ("text", "json"):
+                raise ValueError(
+                    f"target_webhook.format must be 'text' or 'json', got {fmt!r}"
+                )
+            target_webhook = TargetWebhook(url=url, format=fmt)
+
         instance = Instance(
             name=inst_cfg.get("name", "instance"),
             folders=inst_cfg.get("folders", []),
@@ -158,6 +182,7 @@ async def load_instances(config: dict) -> List[Instance]:
             ignore_words=inst_cfg.get("ignore_words", []),
             target_chat=inst_cfg.get("target_chat"),
             target_entity=inst_cfg.get("target_entity"),
+            target_webhook=target_webhook,
             false_positive_entity=inst_cfg.get("false_positive_entity"),
             true_positive_entity=inst_cfg.get("true_positive_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
