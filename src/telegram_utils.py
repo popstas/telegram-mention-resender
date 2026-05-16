@@ -116,6 +116,16 @@ def get_message_url(message):
     return url
 
 
+def _sender_full_name(message) -> str:
+    """Return ``first_name last_name`` from ``message.sender``, or ``""``."""
+    sender = getattr(message, "sender", None)
+    if sender is None:
+        return ""
+    first = (getattr(sender, "first_name", None) or "").strip()
+    last = (getattr(sender, "last_name", None) or "").strip()
+    return " ".join(p for p in (first, last) if p)
+
+
 async def get_message_source(message):
     """Return message source with chat type, name, and optional URL."""
     url = get_message_url(message)
@@ -140,7 +150,16 @@ async def get_message_source(message):
             name = f"@{chat_username}"
 
     if chat_type == "private":
-        base_name = f"{chat_type} {name}"
+        username = getattr(getattr(message, "sender", None), "username", None)
+        full_name = _sender_full_name(message)
+        if username:
+            base_name = f"{chat_type} @{username}"
+            if full_name:
+                base_name = f"{base_name}, Name: {full_name}"
+        elif full_name:
+            base_name = f"{chat_type} Name: {full_name}"
+        else:
+            base_name = f"{chat_type} {name}"
     else:
         base_name = name
 
