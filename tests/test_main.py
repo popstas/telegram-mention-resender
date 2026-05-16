@@ -59,6 +59,20 @@ async def test_get_message_source_text(monkeypatch, dummy_message_cls):
 async def test_get_message_source_private(monkeypatch, dummy_message_cls):
     peer = tgu.types.PeerUser(10)
     msg = dummy_message_cls(peer)
+    msg.sender = SimpleNamespace(username="user", first_name="First", last_name="Last")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "user"
+
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    res = await tgu.get_message_source(msg)
+    assert res == "Forwarded from: private @user, Name: First Last"
+
+
+@pytest.mark.asyncio
+async def test_get_message_source_private_username_only(monkeypatch, dummy_message_cls):
+    peer = tgu.types.PeerUser(10)
+    msg = dummy_message_cls(peer)
     msg.sender = SimpleNamespace(username="user")
 
     async def fake_get_chat_name(v, safe=False):
@@ -67,6 +81,20 @@ async def test_get_message_source_private(monkeypatch, dummy_message_cls):
     monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
     res = await tgu.get_message_source(msg)
     assert res == "Forwarded from: private @user"
+
+
+@pytest.mark.asyncio
+async def test_get_message_source_private_name_only(monkeypatch, dummy_message_cls):
+    peer = tgu.types.PeerUser(10)
+    msg = dummy_message_cls(peer)
+    msg.sender = SimpleNamespace(first_name="First", last_name="Last")
+
+    async def fake_get_chat_name(v, safe=False):
+        return "First Last"
+
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    res = await tgu.get_message_source(msg)
+    assert res == "Forwarded from: private Name: First Last"
 
 
 def test_load_instances_direct():
