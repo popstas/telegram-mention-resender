@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from telethon import TelegramClient, events, types
+from telethon.errors import TypeNotFoundError
 
 from . import langfuse_utils, prompts, telegram_utils, webhook
 from .config import (
@@ -266,6 +267,39 @@ async def handle_reaction(update: "types.UpdateMessageReactions") -> None:
         break
 
 
+async def run_until_disconnected_resilient(
+    tg_client: TelegramClient, backoff_seconds: float = 2.0
+) -> None:
+    """Run the Telethon update loop, restarting on unknown TL constructors.
+
+    Telegram introduces new TL types continuously. If the installed Telethon
+    version doesn't yet know one, the update loop raises ``TypeNotFoundError``
+    via ``_updates_error`` and disconnects. Reconnect and keep listening so the
+    bot stays up. All other exceptions propagate.
+    """
+    while True:
+        try:
+            await tg_client.run_until_disconnected()
+            return
+        except TypeNotFoundError as exc:
+            logger.warning(
+                "Telethon could not parse a TL object (%s); reconnecting. "
+                "Upgrade telethon if this keeps happening.",
+                exc,
+            )
+            # Telethon disconnects on _updates_error; clear and reconnect so
+            # the next iteration can resume listening.
+            try:
+                tg_client._updates_error = None
+            except AttributeError:
+                pass
+            await asyncio.sleep(backoff_seconds)
+            connect = getattr(tg_client, "connect", None)
+            is_connected = getattr(tg_client, "is_connected", None)
+            if callable(connect) and (not callable(is_connected) or not is_connected()):
+                await connect()
+
+
 async def main() -> None:
     global client, instances, config
     config = load_config()
@@ -312,4 +346,4 @@ async def main() -> None:
             if event.chat_id in inst.chat_ids:
                 await process_message(inst, event)
 
-    await client.run_until_disconnected()
+    await run_until_disconnected_resilient(client)
