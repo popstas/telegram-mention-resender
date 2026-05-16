@@ -39,8 +39,11 @@ pip install -r requirements.txt
 - `ignore_user_ids` – list of user IDs to ignore when processing messages.
 - `instances` – list of monitoring instances. Each instance may contain
   `folders`, `chat_ids`, `entities`, `words`, `negative_words`, `ignore_words`, `target_chat`,
-  `target_entity`, `target_webhook`, `folder_mute`, `folder_add_topic`, `false_positive_entity`, `true_positive_entity`
-  and `no_forward_message`.
+  `target_entity`, `target_webhook`, `folder_mute`, `folder_add_topic`, `false_positive_entity`, `true_positive_entity`,
+  `no_forward_message` and `ignore_usernames_override`.
+- `ignore_usernames_override` (per instance) – if defined, this instance ignores the
+  global `ignore_usernames` and uses its own list instead. An empty list (`[]`) means
+  the instance ignores no usernames. Omit the key to inherit the global list.
 
 `folder_add_topic` is a list of topics that should exist in every chat inside the
 instance folders. When a topic is missing, the bot will create it, send an

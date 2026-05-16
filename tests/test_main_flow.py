@@ -312,6 +312,136 @@ async def test_ignore_usernames(
 
 
 @pytest.mark.asyncio
+async def test_ignore_usernames_override_empty(
+    monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path
+):
+    """An empty ignore_usernames_override on an instance disables the global list."""
+    config = {"log_level": "info", "ignore_usernames": ["bad"]}
+    monkeypatch.setattr(app, "load_config", lambda: config)
+    monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
+
+    dummy_client = dummy_tg_client
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
+
+    stats_path = tmp_path / "stats.json"
+    monkeypatch.setattr(
+        app, "stats", stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    )
+
+    async def fake_rescan(inst):
+        return None
+
+    monkeypatch.setattr(app, "rescan_loop", fake_rescan)
+
+    async def fake_update(inst, fr):
+        inst.chat_ids = {1}
+
+    monkeypatch.setattr(app, "update_instance_chat_ids", fake_update)
+
+    async def fake_load_instances(cfg):
+        return [
+            app.Instance(
+                name="i",
+                words=["hi"],
+                target_chat=99,
+                ignore_usernames_override=[],
+            )
+        ]
+
+    monkeypatch.setattr(app, "load_instances", fake_load_instances)
+
+    async def fake_get_message_source(m):
+        return "URL"
+
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+
+    async def fake_get_chat_name(v, safe=False):
+        return "name"
+
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    monkeypatch.setattr(app, "get_chat_name", fake_get_chat_name)
+
+    await app.main()
+
+    handler = dummy_client.on_handler
+    msg = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="hi")
+    msg.sender = SimpleNamespace(username="bad")
+    event = SimpleNamespace(message=msg, chat_id=1)
+    await handler(event)
+    assert msg.forwarded == [99]
+    assert app.stats.data["stats"]["forwarded_total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_ignore_usernames_override_replaces_global(
+    monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path
+):
+    """A non-empty override replaces the global list entirely."""
+    config = {"log_level": "info", "ignore_usernames": ["bad"]}
+    monkeypatch.setattr(app, "load_config", lambda: config)
+    monkeypatch.setattr(app, "get_api_credentials", lambda cfg: (1, "h", "s"))
+
+    dummy_client = dummy_tg_client
+    monkeypatch.setattr(app, "TelegramClient", lambda s, a, b, proxy=None: dummy_client)
+
+    stats_path = tmp_path / "stats.json"
+    monkeypatch.setattr(
+        app, "stats", stats_module.StatsTracker(str(stats_path), flush_interval=0)
+    )
+
+    async def fake_rescan(inst):
+        return None
+
+    monkeypatch.setattr(app, "rescan_loop", fake_rescan)
+
+    async def fake_update(inst, fr):
+        inst.chat_ids = {1}
+
+    monkeypatch.setattr(app, "update_instance_chat_ids", fake_update)
+
+    async def fake_load_instances(cfg):
+        return [
+            app.Instance(
+                name="i",
+                words=["hi"],
+                target_chat=99,
+                ignore_usernames_override=["other"],
+            )
+        ]
+
+    monkeypatch.setattr(app, "load_instances", fake_load_instances)
+
+    async def fake_get_message_source(m):
+        return "URL"
+
+    monkeypatch.setattr(tgu, "get_message_source", fake_get_message_source)
+
+    async def fake_get_chat_name(v, safe=False):
+        return "name"
+
+    monkeypatch.setattr(tgu, "get_chat_name", fake_get_chat_name)
+    monkeypatch.setattr(app, "get_chat_name", fake_get_chat_name)
+
+    await app.main()
+
+    handler = dummy_client.on_handler
+
+    # Sender on global list but NOT on the instance override → forwarded.
+    msg_bad = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=5, text="hi")
+    msg_bad.sender = SimpleNamespace(username="bad")
+    await handler(SimpleNamespace(message=msg_bad, chat_id=1))
+    assert msg_bad.forwarded == [99]
+
+    # Sender on instance override → blocked even though not on global list.
+    msg_other = dummy_message_cls(SimpleNamespace(channel_id=1), msg_id=6, text="hi")
+    msg_other.sender = SimpleNamespace(username="other")
+    await handler(SimpleNamespace(message=msg_other, chat_id=1))
+    assert msg_other.forwarded == []
+
+    assert app.stats.data["stats"]["forwarded_total"] == 1
+
+
+@pytest.mark.asyncio
 async def test_ignore_user_ids(
     monkeypatch, dummy_tg_client, dummy_message_cls, tmp_path
 ):

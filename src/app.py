@@ -336,14 +336,21 @@ async def main() -> None:
         if user_id and user_id in config.get("ignore_user_ids", []):
             logger.debug("Ignoring message from id %s", user_id)
             return
-        if username and username.lower() in [
-            u.lower() for u in config.get("ignore_usernames", [])
-        ]:
-            logger.debug("Ignoring message from @%s", username)
-            return
 
+        global_ignore = config.get("ignore_usernames", [])
         for inst in instances:
-            if event.chat_id in inst.chat_ids:
-                await process_message(inst, event)
+            if event.chat_id not in inst.chat_ids:
+                continue
+            effective_ignore = (
+                inst.ignore_usernames_override
+                if inst.ignore_usernames_override is not None
+                else global_ignore
+            )
+            if username and username.lower() in [u.lower() for u in effective_ignore]:
+                logger.debug(
+                    "Ignoring message from @%s for instance %s", username, inst.name
+                )
+                continue
+            await process_message(inst, event)
 
     await run_until_disconnected_resilient(client)
