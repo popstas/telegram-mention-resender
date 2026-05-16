@@ -46,6 +46,7 @@ class Instance:
     chat_ids: Set[int] = field(default_factory=set)
     folder_mute: bool = False
     no_forward_message: bool = False
+    ignore_usernames_override: Optional[List[str]] = None
     prompts: List[Prompt] = field(default_factory=list)
     folder_add_topic: List[FolderTopic] = field(default_factory=list)
 
@@ -187,6 +188,11 @@ async def load_instances(config: dict) -> List[Instance]:
             true_positive_entity=inst_cfg.get("true_positive_entity"),
             folder_mute=inst_cfg.get("folder_mute", False),
             no_forward_message=inst_cfg.get("no_forward_message", False),
+            ignore_usernames_override=(
+                inst_cfg["ignore_usernames_override"]
+                if "ignore_usernames_override" in inst_cfg
+                else None
+            ),
             prompts=parsed_prompts,
             folder_add_topic=folder_topics,
         )

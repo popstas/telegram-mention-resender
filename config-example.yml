@@ -21,6 +21,10 @@ instances:
         username: "@example_updates_bot"
     folder_mute: false
     no_forward_message: false
+    # Optional per-instance override of the global `ignore_usernames`.
+    # If set (even to an empty list), this instance ignores the global list
+    # and uses this one. If omitted, the global `ignore_usernames` applies.
+    # ignore_usernames_override: []
     words: ["my username"]
     negative_words: []
     ignore_words: []
