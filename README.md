@@ -14,6 +14,10 @@ or webhook.
 and quote for prompt matches), auto-create forum topics for folder chats,
 debounce batching, once-per-chat dedup, and Langfuse tracing.
 
+> **Read-only project.** This client only *watches* and *forwards* matching
+> messages — it does not send messages on your behalf. If you need to send
+> messages, look at [popstas/telegram-assistant](https://github.com/popstas/telegram-assistant).
+
 # Features
 
 - Listen folders, chats, channels
