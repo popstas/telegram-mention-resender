@@ -30,6 +30,9 @@ This project forwards Telegram messages that match specific rules to a target ch
 │   └── __init__.py       # marks package
 ├── scripts/
 │   └── test_webhook_server.py  # manual webhook listener (port 8002)
+├── skills/
+│   └── telegram-resender/ # interactive config.yml instance wizard (SKILL.md + instance-options.md)
+│                          # symlinked from .claude/skills/telegram-resender for discovery
 ├── tests/                # pytest suite
 ├── README.md             # setup instructions
 ├── CHANGELOG.md          # generated from conventional commits by git-cliff
