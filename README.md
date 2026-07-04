@@ -33,6 +33,34 @@ debounce batching, once-per-chat dedup, and Langfuse tracing.
 - Optional cancel of a pending debounce batch when the account owner replies (`cancel_on_owner_reply`)
 - Configurable forwarded-message preface (`message_template` / `forward_message` flags)
 
+## Add instances with the config skill
+
+Editing `data/config.yml` by hand is easy to get wrong. This repo ships a
+[`telegram-resender`](skills/telegram-resender/SKILL.md) skill that runs an
+interactive wizard.
+
+Just describe what you want in plain language — the wizard asks for anything it
+still needs:
+
+- **Simplest one-liner:** `/telegram-resender resend messages contains "main"
+  from t.me/chat1 to t.me/chat2` → an instance with `entities: [t.me/chat1]`,
+  `words: ["main"]` and `target_entity: t.me/chat2`.
+- **Watch a folder for your name:** *"Add an instance named `Work watcher` that
+  watches the `Work` folder for the word `my username` and forwards matches to
+  t.me/chat2, only the first match per chat per day."* → an instance with
+  `folders: [Work]`, `words: ["my username"]`, `target_entity` and
+  `once_per_chat: true`.
+- **Batch a noisy chat:** *"Add `Support batcher` for t.me/chat1, trigger on
+  `help` or `urgent`, but debounce for 60 seconds so a whole conversation
+  forwards as one message."* → `entities`, `words`, `debounce_ms: 60000`.
+- **AI-scored forwarding to a webhook:** *"Add `Leads` watching t.me/somechannel,
+  no keyword — score each message with a prompt for buying intent and forward
+  matches above threshold 4 to my webhook at http://127.0.0.1:8002/webhook as
+  JSON."* → `entities`, a `prompts` entry with `threshold`, and a `target_webhook`.
+- **Edit or remove:** *"Change the `Work watcher` instance to also ignore messages
+  containing `spam`."* or *"Remove the `Leads` instance."* → the skill lists your
+  instances, makes a surgical edit, and re-validates the config.
+
 ## Setup
 
 1. Install Python 3.10+ and create a virtual environment.
