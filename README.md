@@ -16,7 +16,12 @@ debounce batching, once-per-chat dedup, and Langfuse tracing.
 
 > **Read-only project.** This client only *watches* and *forwards* matching
 > messages — it does not send messages on your behalf. If you need to send
-> messages, look at [popstas/telegram-assistant](https://github.com/popstas/telegram-assistant).
+> messages, create groups/topics, manage members and folders, look at
+> [popstas/telegram-assistant](https://github.com/popstas/telegram-assistant).
+>
+> **Just want to download a chat's history once?** For a read-only export of any
+> chat to JSON/TXT/HTML/PDF, see
+> [popstas/telegram-download-chat](https://github.com/popstas/telegram-download-chat).
 
 # Features
 
